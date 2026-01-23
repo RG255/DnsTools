@@ -1,0 +1,259 @@
+﻿#!/usr/bin/env powershell
+#requires -Version 5.0
+
+try 
+{
+	Function Publish-CustomXML 
+	{
+		ForEach ($Item in ($MyCustomXML.GetEnumerator() | Sort-Object -Property key).Name) 
+		{
+			$XMLItem = (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\{1}' -f $Option, $MyCustomXML[$Item].file))
+			If (Test-Path -Path $XMLItem) 
+			{
+				Switch ($MyCustomXML[$Item].Action) {
+					'Update-FormatData' 
+					{
+						Switch ($MyCustomXML[$Item].Option) {
+							'Prependpath' 
+							{Update-FormatData -PrependPath $XMLItem -ErrorAction Stop}
+							'Appendpath'  
+							{Update-FormatData -AppendPath  $XMLItem -ErrorAction Stop}
+						}
+					}
+					Default 
+					{'Unknown item in {0}MyCustomXML: [{1}] Option: [{2}]' -f $StrDollar, $Item, $MyCustomXML[$Item].Option | Write-Warning}
+				}
+			}
+		}
+	}
+
+	Function Initialize-Folders 
+	{
+		[CmdletBinding()]
+		Param ([Parameter(Mandatory)]
+		[Array] $Folders)
+
+		foreach ($Item in $Folders) 
+		{
+			$Path = Join-Path -Path $ModuleScriptRoot -ChildPath $Item
+			If (-not (Test-Path -Path $Path)) 
+			{$null = New-Item -Path $Path -ItemType Directory}
+		}
+	}
+
+	Function Publish-Variables 
+	{
+		Try 
+		{
+			ForEach ($VarSet in ($MyVars.GetEnumerator() | Sort-Object -Property key).Name) 
+			{
+				ForEach ($Item in ($MyVars[$VarSet].GetEnumerator() | Sort-Object -Property key).Name) 
+				{
+					$Params = @{
+						Name   = $Item
+						Value  = $MyVars[$VarSet][$Item].Value
+						Option = $MyVars[$VarSet][$Item].Option
+						Scope  = $MyVars[$VarSet][$Item].Scope
+					}
+					New-Variable @Params -ErrorAction Stop
+					Export-ModuleMember -Variable $Item -ErrorAction Stop
+				}
+			}
+		}
+		Catch 
+		{
+			$Msg = 'Variable:[{0}] Failed to create Value: [{1}]' -f $Item, $Params.Value
+			Write-Information -MessageData $Msg -InformationAction Continue
+		}
+	}
+
+	Function Get-Psd1Data 
+	{
+		[CmdletBinding()]
+		Param (
+			[Parameter(Mandatory)]
+			[Microsoft.PowerShell.DesiredStateConfiguration.ArgumentToConfigurationDataTransformation()]
+			[HashTable] $PathToPsd1file
+		)
+		$PathToPsd1file
+	}
+
+	Function Publish-MyEnvironment 
+	{
+		[CmdletBinding()]
+		Param ([String]$Option = $null)
+
+		If ($MyVariables = (Get-ChildItem -Path (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-Variables*{1}' -f $Option, '.ps1')) -ErrorAction Ignore)) 
+		{
+			foreach ($Item in ($MyVariables.fullname | Sort-Object)) 
+			{. $Item}
+		}
+
+		If ($MyCustomXML = (Get-ChildItem -Path (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-CustomXML.ps1' -f $Option)) -ErrorAction Ignore)) 
+		{
+			foreach ($Item in ($MyCustomXML.fullname | Sort-Object)) 
+			{. $Item}
+		}
+	}
+
+	# -------------------------
+	# INITIAL MODULE SETUP
+	# -------------------------
+	$Global:Error.clear()
+	$ModuleScriptRoot = $PSScriptRoot
+	$ModuleName = (Split-Path -Path (Split-Path -Path $ModuleScriptRoot -Parent) -Leaf)
+	$PSD1Path = (Join-Path -Path $ModuleScriptRoot -ChildPath ('{0}.psd1' -f $ModuleName))
+	$PSD1Data = Get-Psd1Data -PathToPsd1file ('{0}' -f $PSD1Path)
+}
+catch 
+{throw 'Unable to retrieve required data from: [{0}]' -f $PSD1Path}
+
+try 
+{
+	# -------------------------
+	# CREATE FOLDERS
+	# -------------------------
+	Initialize-Folders -Folders @(
+		'Classes\BinaryInfrastructure',
+		'Classes\Core',
+		'Classes\Basic',
+		'Classes\DNSSEC',
+		'Classes\Resource',
+		'Classes\EDNS-OPT',
+		'Classes\DNS',
+		'Classes\Transport',
+		'Helpers',
+		'Functions',
+		'FunctionsLinux',
+		'FunctionsWindows',
+		'FunctionsMacOS'
+	)
+
+	# -------------------------
+	# LOAD VARIABLES & XML
+	# -------------------------
+	Publish-MyEnvironment
+
+	# -------------------------
+	# LOAD CLASSES FIRST
+	# -------------------------
+	$ClassLoadOrder = @(
+		# Tier 1: Binary infrastructure
+		'BinaryInfrastructure\DnsBinaryWriter.ps1'
+		'BinaryInfrastructure\DnsBinaryReader.ps1'
+
+		# Tier 2: Core DNS structures
+		'Core\DnsHeader.ps1'
+		'Core\DnsQuestion.ps1'
+
+		# Tier 3: Basic RDATA types
+		'Basic\DnsARecord.ps1'
+		'Basic\DnsAaaaRecord.ps1'
+		'Basic\DnsCnameRecord.ps1'
+		'Basic\DnsMxRecord.ps1'
+		'Basic\DnsTxtRecord.ps1'
+		'Basic\DnsSrvRecord.ps1'
+		'Basic\DnsNsRecord.ps1'
+
+		# Tier 4: DNSSEC RDATA types
+		'DNSSEC\DnsDnskeyRecord.ps1'
+		'DNSSEC\DnsDsRecord.ps1'
+		'DNSSEC\DnsRrsigRecord.ps1'
+		'DNSSEC\DnsNsecRecord.ps1'
+		'DNSSEC\DnsNsec3Record.ps1'
+
+		# Tier 5: Resource Record container
+		'Resource\DnsResourceRecord.ps1'
+
+		# Tier 6: EDNS / OPT
+		'EDNS-OPT\DnsOptRecord.ps1'
+
+		# Tier 7: DNS Packet
+		'DNS\DnsPacket.ps1'
+
+		# Tier 8: Transport clients
+		'Transport\DnsDotClient.ps1'
+		'Transport\DnsDohClient.ps1'
+	)
+	
+	foreach ($file in $ClassLoadOrder) 
+	{. (Join-Path -Path $ModuleScriptRoot -ChildPath "Classes\$file")}
+
+
+
+	# -------------------------
+	# LOAD COMMON FUNCTIONS
+	# -------------------------
+	$Exclude = @('Define-CustomXML|Define-Variables|\.zip$')
+	$CommonPath = Join-Path -Path $ModuleScriptRoot -ChildPath 'Functions\*.ps1'
+	$CommonFunctions = Get-ChildItem -Path $CommonPath | Where-Object {$_.Name -inotmatch $Exclude}
+
+	foreach ($Item in $CommonFunctions) 
+	{
+		. $Item.FullName
+		Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+	}
+
+	# -------------------------
+	# OS-SPECIFIC FUNCTIONS
+	# -------------------------
+	Switch ($True) {
+		($IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) 
+		{
+			Publish-MyEnvironment -Option 'Windows'
+			$WinPath = Join-Path -Path $ModuleScriptRoot -ChildPath 'FunctionsWindows\*.ps1'
+			$WinFunctions = Get-ChildItem -Path $WinPath | Where-Object {$_.Name -inotmatch $Exclude}
+
+			foreach ($Item in $WinFunctions) 
+			{
+				. $Item.FullName
+				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+			}
+		}
+
+		$IsLinux 
+		{
+			Publish-MyEnvironment -Option 'Linux'
+			$LinPath = Join-Path -Path $ModuleScriptRoot -ChildPath 'FunctionsLinux\*.ps1'
+			$LinFunctions = Get-ChildItem -Path $LinPath | Where-Object {$_.Name -inotmatch $Exclude}
+
+			foreach ($Item in $LinFunctions) 
+			{
+				. $Item.FullName
+				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+			}
+		}
+
+		$IsMacOS 
+		{
+			Publish-MyEnvironment -Option 'MacOS'
+			$MacPath = Join-Path -Path $ModuleScriptRoot -ChildPath 'FunctionsMacOS\*.ps1'
+			$MacFunctions = Get-ChildItem -Path $MacPath | Where-Object {$_.Name -inotmatch $Exclude}
+
+			foreach ($Item in $MacFunctions) 
+			{
+				. $Item.FullName
+				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+			}
+		}
+
+		Default 
+		{throw 'Operating System Unknown'}
+	}
+
+	$MyInitialCallStack = Get-PSCallStack
+	$MyInitialCallingScript = $MyInitialCallStack.InvocationInfo.MyCommand[1].ScriptBlock
+}
+catch 
+{
+	# if any error occurs output salient information
+	$NumberOfErrors = [int]$Global:Error.count
+	$ErrorNumber = $NumberOfErrors - 1
+	'{1}{1}An error occurred while processing: [{0}]{1}{1}Message      : [{2}]{1}Command Path : [{3}]{1}Line No.     : [{4}]{1}Failing Line :Command Path: [{5}]{1}{1}' -f (Join-Path -Path $ModuleScriptRoot -ChildPath $PSD1Data.RootModule), "`r`n", 
+	($Global:Error[$ErrorNumber].Exception.Message).Replace(('{0}' -f "`r`n"), ''), 
+	$Global:Error[$ErrorNumber].InvocationInfo.PSCommandPath, 
+	$Global:Error[$ErrorNumber].InvocationInfo.ScriptLineNumber, 
+	($Global:Error[$ErrorNumber].InvocationInfo.Line).Trim() | Write-Warning
+	
+	throw 'Unable to initialise module: {0}' -f $ModuleName
+}
