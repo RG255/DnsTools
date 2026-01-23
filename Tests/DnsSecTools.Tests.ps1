@@ -6,7 +6,7 @@ using module dnstools
 #
 # IMPORTANT:
 # using module must be the first real statement in the file.
-using module 'D:\PowerShellScripts\RawDns\0.3\DnsSecTools.psd1'
+using module dnstools
 
 # ------------------------------------------------------------
 # DNSSEC Trust Anchor Setup

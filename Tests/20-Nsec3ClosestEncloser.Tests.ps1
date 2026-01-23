@@ -1,6 +1,6 @@
 ﻿using module dnstools
 
-using module 'D:\PowerShellScripts\RawDns\0.3\DnsSecTools.psd1'
+using module dnstools
 
 Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 	#

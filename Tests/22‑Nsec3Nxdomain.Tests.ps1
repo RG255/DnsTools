@@ -1,6 +1,6 @@
 ﻿using module dnstools
 
-using module "..\DnsSecTools.psm1"
+using module dnstools
 
 Describe "NSEC3 NXDOMAIN Proof" {
 

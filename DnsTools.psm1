@@ -1256,7 +1256,7 @@ try {
 
 	foreach ($Item in $CommonFunctions) {
 		. $Item.FullName
-		#Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+		Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
 	}
 
 	# OS-specific functions
@@ -1269,7 +1269,7 @@ try {
 
 			foreach ($Item in $WinFunctions) {
 				. $Item.FullName
-				#Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
 			}
 		}
 
@@ -1280,7 +1280,7 @@ try {
 
 			foreach ($Item in $LinFunctions) {
 				. $Item.FullName
-				#Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
 			}
 		}
 
@@ -1291,49 +1291,13 @@ try {
 
 			foreach ($Item in $MacFunctions) {
 				. $Item.FullName
-				#Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
 			}
 		}
 		default {
 			throw 'Operating System Unknown'
 		}
 	}
-	$PublicFunctions = @(
-		'Add-DnssecTrustAnchor'
-		'ConvertFrom-DnsWireBytes'
-		'ConvertTo-DnsWireBytes'
-		'ConvertTo-HexString'
-		'Format-DnssecResult'
-		'Get-DnssecCanonicalNameWire'
-		'Get-DnssecCanonicalRrsetData'
-		'Get-DnssecCanonicalRrWire'
-		'Get-DnssecKeyDigest'
-		'Get-DnssecKeyDigestHex'
-		'Get-DnssecNsec3Hash'
-		'Get-DnssecSignedData'
-		'Get-DnssecSigningKey'
-		'Get-DnssecTrustAnchors'
-		'Import-DnssecTrustAnchors'
-		'Initialize-DnssecTrustAnchors'
-		'Invoke-DnsUdpQuery'
-		'New-DnsQueryPacket'
-		'Resolve-DnsIterative'
-		'Resolve-Dnssec'
-		'Resolve-DnssecChain'
-		'Resolve-DnssecName'
-		'Resolve-NameserverAddress'
-		'Test-DnssecAnchoredDnskey'
-		'Test-DnssecChain'
-		'Test-DnssecDsForDnskey'
-		'Test-DnssecName'
-		'Test-DnssecNsec3Nodata'
-		'Test-DnssecNsec3Nxdomain'
-		'Test-DnssecNsec3OptOut'
-		'Test-DnssecRrsig'
-		'Test-DnssecSignature'
-		'Test-DnssecTimeWindow'
-	)
-	Export-ModuleMember -Function $PublicFunctions #-Alias @() -Variable @()
 }
 catch {
 		Write-Warning "Module initialization failed: $($_.Exception.Message)"

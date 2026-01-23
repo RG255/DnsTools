@@ -1,1 +1,1 @@
-﻿using module '..\..\DnsSecTools.psm1'
+﻿using module dnstools

@@ -3,7 +3,7 @@
 
 using module dnstools
 
-using module 'D:\PowerShellScripts\RawDns\0.3\DnsSecTools.psm1'
+using module dnstools
 #Import-Module ('{0}/../DnsSecTools.psd1' -f $PSScriptRoot) -Force
 
 Describe -Name 'NSEC Record Parsing and Encoding' -Fixture {

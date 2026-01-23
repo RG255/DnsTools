@@ -1,4 +1,4 @@
-﻿using module DnsTools
+﻿using module dnstools
 
 Describe "DNS Name Compression" {
 

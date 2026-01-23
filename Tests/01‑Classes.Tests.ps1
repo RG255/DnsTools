@@ -1,4 +1,4 @@
-﻿using module '..\DnsTools.psm1'
+﻿using module dnstools
 
 Describe "Class Loading" {
 
