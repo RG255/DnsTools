@@ -1,4 +1,4 @@
-﻿using module DnsTools
+﻿using module dnstools
 Describe "Iterative Resolver" {
 
     It "Follows root → TLD → zone → answer" {

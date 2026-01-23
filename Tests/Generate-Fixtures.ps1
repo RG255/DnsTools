@@ -1,4 +1,4 @@
-﻿using module DnsTools
+﻿using module dnstools
 
 param(
 	[string]$OutputPath = (Join-Path -Path $PSScriptRoot -ChildPath 'Fixtures')

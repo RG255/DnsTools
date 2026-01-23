@@ -1,4 +1,4 @@
-﻿using module DnsTools
+﻿using module dnstools
 Describe "Glue Handling" {
 
     It "Prefers glue over NS recursion" {
