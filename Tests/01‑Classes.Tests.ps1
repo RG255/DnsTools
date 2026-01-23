@@ -14,7 +14,11 @@ Describe "Class Loading" {
         )
 
         foreach ($c in $classes) {
-            $type = [System.Management.Automation.LanguagePrimitives]::ConvertTo($c, [type], $null)
+            $type = [AppDomain]::CurrentDomain.GetAssemblies() |
+                    ForEach-Object { $_.GetTypes() } |
+                    Where-Object { $_.Name -eq $c } |
+                    Select-Object -First 1
+
             $type | Should -Not -BeNullOrEmpty
         }
     }
