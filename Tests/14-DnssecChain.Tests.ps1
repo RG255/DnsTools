@@ -1,4 +1,4 @@
-﻿# Tests/14-DnssecChain.Tests.ps1
+# Tests/14-DnssecChain.Tests.ps1
 # DNSSEC Chain Validation Tests
 
 using module dnstools
@@ -10,7 +10,15 @@ Describe "DNSSEC Chain Validation" {
         # Build synthetic DNSKEY RRset
         #
         $rsa = [System.Security.Cryptography.RSA]::Create(2048)
-        $rsaPub = $rsa.ExportSubjectPublicKeyInfo()
+        $rsaParams = $rsa.ExportParameters($false)
+
+        # Convert to DNSKEY wire format: [exp_len][exponent][modulus]
+        $expLen = $rsaParams.Exponent.Length
+        if ($expLen -le 255) {
+            $rsaPub = [byte[]]@($expLen) + $rsaParams.Exponent + $rsaParams.Modulus
+        } else {
+            $rsaPub = [byte[]]@(0, ($expLen -shr 8), ($expLen -band 0xFF)) + $rsaParams.Exponent + $rsaParams.Modulus
+        }
 
         $dnskey = [DnsDnskeyRecord]::new(
             256, 3, 8, $rsaPub
@@ -25,8 +33,8 @@ Describe "DNSSEC Chain Validation" {
             $dnskey
         )
 
-        Set-Variable -Name TestDnskey -Value $dnskey -Scope Script
-        Set-Variable -Name TestDnskeyRR -Value $dnskeyRR -Scope Script
+        $script:TestDnskey = $dnskey
+        $script:TestDnskeyRR = $dnskeyRR
 
         #
         # Build synthetic DS record
@@ -49,8 +57,8 @@ Describe "DNSSEC Chain Validation" {
             $ds
         )
 
-        Set-Variable -Name TestDs -Value $ds -Scope Script
-        Set-Variable -Name TestDsRR -Value $dsRR -Scope Script
+        $script:TestDs = $ds
+        $script:TestDsRR = $dsRR
 
         #
         # Build synthetic RRSIG over DNSKEY RRset
@@ -84,13 +92,13 @@ Describe "DNSSEC Chain Validation" {
             $rrsig
         )
 
-        Set-Variable -Name TestRrsig -Value $rrsig -Scope Script
-        Set-Variable -Name TestRrsigRR -Value $rrsigRR -Scope Script
+        $script:TestRrsig = $rrsig
+        $script:TestRrsigRR = $rrsigRR
 
         #
         # Mock Get-DnssecSignedData to return deterministic data
         #
-        Mock Get-DnssecSignedData { return $data }
+        Mock Get-DnssecSignedData { return $data } -ModuleName DnsTools
     }
 
     Context "DS → DNSKEY Matching" {
@@ -146,7 +154,7 @@ Describe "DNSSEC Chain Validation" {
                 48, 8, 1, 3600,
                 ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 3600),
                 ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - 3600),
-                99999,  # wrong key tag
+                65000,  # wrong key tag
                 "example.com",
                 $Script:TestRrsig.Signature
             )
@@ -204,7 +212,7 @@ Describe "DNSSEC Chain Validation" {
                 48, 8, 1, 3600,
                 ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 3600),
                 ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - 3600),
-                99999,
+                65000,
                 "example.com",
                 $Script:TestRrsig.Signature
             )

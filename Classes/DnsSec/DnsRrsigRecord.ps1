@@ -31,16 +31,16 @@ class DnsRrsigRecord {
 		# RDATA begins here
 		$startPos = $r.Position
 
-		$typeCval  = $r.ReadUInt16BE()
-		$algVal    = $r.ReadUInt8()
-		$labelsval = $r.ReadUInt8()
-		$origval   = $r.ReadUInt32BE()
-		$expval    = $r.ReadUInt32BE()
-		$incval    = $r.ReadUInt32BE()
-		$tagval    = $r.ReadUInt16BE()
+		$typeC  = $r.ReadUInt16BE()
+		$alg    = $r.ReadUInt8()
+		$lbls = $r.ReadUInt8()
+		$orig   = $r.ReadUInt32BE()
+		$exp    = $r.ReadUInt32BE()
+		$inc    = $r.ReadUInt32BE()
+		$tag    = $r.ReadUInt16BE()
 
 		# SignerName may be compressed â†’ must use main reader
-		$signerval = $r.ReadName()
+		$signer = $r.ReadName()
 
 		# How many bytes have we consumed so far?
 		$bytesConsumed = $r.Position - $startPos
@@ -50,13 +50,13 @@ class DnsRrsigRecord {
 		if ($remaining -lt 0) 
 		{throw "RRSIG parse overran RDLENGTH: consumed $bytesConsumed of $len"}
 
-		$sigval = if ($remaining -gt 0) 
+		$sig = if ($remaining -gt 0) 
 		{$r.ReadBytes($remaining)}
 		else 
 		{[byte[]]@()}
 
 		return [DnsRrsigRecord]::new(
-			$typeCval,$algVal,$labelsval,$origval,$expval,$incval,$tagval,$signerval,$sigval
+			$typeC,$alg,$lbls,$orig,$exp,$inc,$tag,$signer,$sig
 		)
 	}
 

@@ -1,0 +1,9 @@
+# Development scratch pad - not part of the module
+Debug/
+Other/
+
+# Claude Code tool configuration
+.claude/
+
+# Generated cache files
+Helpers/RootHints-Cache.xml

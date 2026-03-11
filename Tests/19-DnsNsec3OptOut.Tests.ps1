@@ -1,14 +1,14 @@
-﻿# Test Set 19 - NSEC3 Opt-Out Logic
+# Test Set 19 - NSEC3 Opt-Out Logic
 # Run with: Invoke-Pester
 
 using module dnstools
 
-using module dnstools
 #Import-Module ('{0}/../DnsSecTools.psd1' -f $PSScriptRoot) -Force
 
 Describe 'NSEC3 Opt-Out Behaviour' {
 
     It 'Allows a gap when Opt-Out flag is set and skipped name is a delegation' {
+        $ownerHash = [byte[]](0..19 | ForEach-Object { 0x11 })
         $nextHash = [byte[]](0..19 | ForEach-Object { 0xAA })
 
         $nsec3 = [DnsNsec3Record]::new(
@@ -16,6 +16,7 @@ Describe 'NSEC3 Opt-Out Behaviour' {
             1,      # Flags (Opt-Out)
             10,     # Iterations
             [byte[]]@(),
+            $ownerHash,
             $nextHash,
             [int[]]@()
         )
@@ -28,6 +29,7 @@ Describe 'NSEC3 Opt-Out Behaviour' {
     }
 
     It 'Rejects a gap when Opt-Out flag is set but skipped name is NOT a delegation' {
+        $ownerHash = [byte[]](0..19 | ForEach-Object { 0x11 })
         $nextHash = [byte[]](0..19 | ForEach-Object { 0xAA })
 
         $nsec3 = [DnsNsec3Record]::new(
@@ -35,6 +37,7 @@ Describe 'NSEC3 Opt-Out Behaviour' {
             1,
             10,
             [byte[]]@(),
+            $ownerHash,
             $nextHash,
             [int[]]@()
         )
@@ -47,6 +50,7 @@ Describe 'NSEC3 Opt-Out Behaviour' {
     }
 
     It 'Rejects a gap when Opt-Out flag is NOT set' {
+        $ownerHash = [byte[]](0..19 | ForEach-Object { 0x11 })
         $nextHash = [byte[]](0..19 | ForEach-Object { 0xAA })
 
         $nsec3 = [DnsNsec3Record]::new(
@@ -54,6 +58,7 @@ Describe 'NSEC3 Opt-Out Behaviour' {
             0,      # Flags = 0 → no Opt-Out
             10,
             [byte[]]@(),
+            $ownerHash,
             $nextHash,
             [int[]]@()
         )

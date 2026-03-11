@@ -14,14 +14,15 @@ class DnsDnskeyRecord {
 		$this.KeyTag = [DnsDnskeyRecord]::ComputeKeyTag($flags, $proto, $alg, $key)
 	}
     
-	static [DnsDnskeyRecord] Parse([byte[]]$rdata) 
+	static [DnsDnskeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r        = [DnsBinaryReader]::new($rdata)
-		$flagsval = $r.ReadUInt16BE()
-		$protoVal = $r.ReadUInt8()
-		$algVal   = $r.ReadUInt8()
-		$keyVal   = $r.ReadBytes($rdata.Length - $r.Position)
-		return [DnsDnskeyRecord]::new($flagsval, $protoVal, $algVal, $keyVal)
+		$startPos = $r.Position
+		$flgs = $r.ReadUInt16BE()
+		$proto = $r.ReadUInt8()
+		$alg   = $r.ReadUInt8()
+		$remaining = $len - ($r.Position - $startPos)
+		$key   = $r.ReadBytes($remaining)
+		return [DnsDnskeyRecord]::new($flgs, $proto, $alg, $key)
 	}
 
 	static [uint16] ComputeKeyTag(

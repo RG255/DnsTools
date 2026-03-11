@@ -1,27 +1,28 @@
-﻿using module dnstools
+# Run-Tests.ps1
+# Test runner that sets up the environment for DnsTools testing
 
 param(
-    [switch]$CI
+    [string]$Path = $PSScriptRoot,
+    [string]$Output = 'Normal',
+    [string]$TagFilter,
+    [string]$ExcludeTagFilter
 )
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$tests = Join-Path $root "Tests"
+# Export all functions for testing
+$env:DNSTOOLS_EXPORT_ALL = '1'
 
-Write-Host "Running Pester tests from: $tests"
-
-# Import the module under test
-$modulePath = Join-Path $root "DnsToolkit.psm1"
-Import-Module $modulePath -Force
-
-$configuration = New-PesterConfiguration
-
-$configuration.Run.Path = $tests
-$configuration.Run.PassThru = $true
-$configuration.Output.Verbosity = if ($CI) { "Detailed" } else { "Normal" }
-
-$result = Invoke-Pester -Configuration $configuration
-
-if ($CI -and $result.FailedCount -gt 0) {
-    Write-Error "One or more tests failed"
-    exit 1
+# Build Pester parameters
+$pesterParams = @{
+    Path   = $Path
+    Output = $Output
 }
+
+if ($TagFilter) {
+    $pesterParams['TagFilter'] = $TagFilter
+}
+if ($ExcludeTagFilter) {
+    $pesterParams['ExcludeTagFilter'] = $ExcludeTagFilter
+}
+
+# Run tests
+Invoke-Pester @pesterParams

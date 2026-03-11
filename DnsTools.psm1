@@ -1,4 +1,4 @@
-﻿#requires -Version 5.0
+#requires -Version 5.0
 
 Set-StrictMode -Version Latest
 
@@ -146,6 +146,9 @@ class DnsBinaryReader {
     # so that pointer jumps do not overwrite the main reader position.
     $pos = $this.Position
 
+    # Track the final position in the wire format (after compression pointer if any)
+    $finalPosition = $null
+
     while ($true)
     {
         # Detect loops BEFORE reading anything at this offset
@@ -163,6 +166,10 @@ class DnsBinaryReader {
         # End of name
         if ($len -eq 0) {
             $pos++
+            # Only update final position if we haven't encountered a pointer yet
+            if ($null -eq $finalPosition) {
+                $finalPosition = $pos
+            }
             break
         }
 
@@ -182,7 +189,12 @@ class DnsBinaryReader {
                 throw "DNS compression pointer out of bounds: $pointer"
             }
 
-            # Move pos to the pointer target, but DO NOT advance $this.Position yet
+            # Set final position to after the 2-byte pointer (only first time)
+            if ($null -eq $finalPosition) {
+                $finalPosition = $pos + 2
+            }
+
+            # Move pos to the pointer target to continue reading the name
             $pos = $pointer
             continue
         }
@@ -206,8 +218,8 @@ class DnsBinaryReader {
         $pos += ($len + 1)
     }
 
-    # Update the main reader position to where the name ended
-    $this.Position = $pos
+    # Update the main reader position to the final wire format position
+    $this.Position = $finalPosition
 
     return ($labels -join '.')
 }
@@ -280,19 +292,21 @@ class DnsQuestion {
 }
 class DnsARecord {
 	[string]$Address
-	static [DnsARecord] Parse([byte[]]$rdata) 
+	static [DnsARecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
+		$bytes = $r.ReadBytes($len)
 		return [DnsARecord]@{
-			Address = ([System.Net.IPAddress]::new($rdata)).ToString()
+			Address = ([System.Net.IPAddress]::new($bytes)).ToString()
 		}
 	}
 }
 class DnsAaaaRecord {
 	[string]$Address
-	static [DnsAaaaRecord] Parse([byte[]]$rdata) 
+	static [DnsAaaaRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
+		$bytes = $r.ReadBytes($len)
 		return [DnsAaaaRecord]@{
-			Address = ([System.Net.IPAddress]::new($rdata)).ToString()
+			Address = ([System.Net.IPAddress]::new($bytes)).ToString()
 		}
 	}
 }
@@ -328,9 +342,9 @@ class DnsMxRecord {
 
 	static [DnsMxRecord] Parse([DnsBinaryReader]$r, [int]$len) 
 	{
-		$prefVal = $r.ReadUInt16BE()
-		$exchVal = $r.ReadName()
-		return [DnsMxRecord]::new($prefVal, $exchVal)
+		$pref = $r.ReadUInt16BE()
+		$exch = $r.ReadName()
+		return [DnsMxRecord]::new($pref, $exch)
 	}
 
 	[byte[]]ToWire() 
@@ -347,19 +361,20 @@ class DnsTxtRecord {
 	DnsTxtRecord([string[]]$strings) 
 	{$this.Strings = $strings}
 
-	static [DnsTxtRecord] Parse([byte[]]$rdata) 
+	static [DnsTxtRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r          = [DnsBinaryReader]::new($rdata)
-		$stringsval = New-Object -TypeName System.Collections.Generic.List[string]
+		$startPos   = $r.Position
+		$endPos     = $startPos + $len
+		$strs = New-Object -TypeName System.Collections.Generic.List[string]
 
-		while ($r.Position -lt $r.Buffer.Length) 
+		while ($r.Position -lt $endPos)
 		{
-			$lenval   = $r.ReadUInt8()
-			$bytesval = $r.ReadBytes($lenval)
-			$null     = $stringsval.Add([System.Text.Encoding]::ASCII.GetString($bytesval))
+			$len   = $r.ReadUInt8()
+			$bytes = $r.ReadBytes($len)
+			$null     = $strs.Add([System.Text.Encoding]::ASCII.GetString($bytes))
 		}
 
-		return [DnsTxtRecord]::new($stringsval.ToArray())
+		return [DnsTxtRecord]::new($strs.ToArray())
 	}
 
 	[byte[]]ToWire() 
@@ -391,11 +406,11 @@ class DnsSrvRecord {
 	static [DnsSrvRecord] Parse([DnsBinaryReader]$r, [int]$len)
  
 	{
-		$prival  = $r.ReadUInt16BE()
-		$wgtval  = $r.ReadUInt16BE()
-		$portval = $r.ReadUInt16BE()
-		$tgtval  = $r.ReadName()
-		return [DnsSrvRecord]::new($prival,$wgtval,$portval,$tgtval)
+		$pri  = $r.ReadUInt16BE()
+		$wgt  = $r.ReadUInt16BE()
+		$prt = $r.ReadUInt16BE()
+		$tgt  = $r.ReadName()
+		return [DnsSrvRecord]::new($pri,$wgt,$prt,$tgt)
 	}
 
 	[byte[]]ToWire() 
@@ -420,6 +435,299 @@ class DnsNsRecord {
 		return [DnsNsRecord]::new($name)
 	}
 }
+class DnsPtrRecord {
+    [string]$Pointer
+
+    DnsPtrRecord([string]$pointer) {
+        $this.Pointer = $pointer
+    }
+
+    static [DnsPtrRecord] Parse([DnsBinaryReader]$r, [int]$len) {
+        $name = $r.ReadName()
+        return [DnsPtrRecord]::new($name)
+    }
+
+    [byte[]]ToWire() {
+        $w = [DnsBinaryWriter]::new()
+        $w.WriteName($this.Pointer)
+        return $w.ToArray()
+    }
+}
+class DnsSoaRecord {
+	[string]$MName      # Primary nameserver
+	[string]$RName      # Responsible person email (@ replaced with .)
+	[uint32]$Serial     # Zone serial number
+	[uint32]$Refresh    # Seconds between zone refreshes
+	[uint32]$Retry      # Seconds between retry attempts
+	[uint32]$Expire     # Seconds until zone is no longer authoritative
+	[uint32]$Minimum    # Minimum TTL for negative caching
+
+	DnsSoaRecord(
+		[string]$mname,
+		[string]$rname,
+		[uint32]$serial,
+		[uint32]$refresh,
+		[uint32]$retry,
+		[uint32]$expire,
+		[uint32]$minimum
+	)
+	{
+		$this.MName   = $mname
+		$this.RName   = $rname
+		$this.Serial  = $serial
+		$this.Refresh = $refresh
+		$this.Retry   = $retry
+		$this.Expire  = $expire
+		$this.Minimum = $minimum
+	}
+
+	static [DnsSoaRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$mn   = $r.ReadName()
+		$rn   = $r.ReadName()
+		$ser  = $r.ReadUInt32BE()
+		$rfr = $r.ReadUInt32BE()
+		$rty   = $r.ReadUInt32BE()
+		$xpr  = $r.ReadUInt32BE()
+		$min = $r.ReadUInt32BE()
+
+		return [DnsSoaRecord]::new(
+			$mn, $rn, $ser,
+			$rfr, $rty, $xpr, $min
+		)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName($this.MName)
+		$w.WriteName($this.RName)
+		$w.WriteUInt32BE($this.Serial)
+		$w.WriteUInt32BE($this.Refresh)
+		$w.WriteUInt32BE($this.Retry)
+		$w.WriteUInt32BE($this.Expire)
+		$w.WriteUInt32BE($this.Minimum)
+		return $w.ToArray()
+	}
+}
+class DnsCaaRecord {
+	[byte]$Flags        # Flags byte (bit 0 = critical flag)
+	[string]$Tag        # Property tag (e.g., "issue", "issuewild", "iodef")
+	[string]$Value      # Property value
+
+	DnsCaaRecord([byte]$flags, [string]$tg, [string]$value)
+	{
+		$this.Flags = $flags
+		$this.Tag   = $tg
+		$this.Value = $value
+	}
+
+	static [DnsCaaRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$startPos = $r.Position
+		$endPos   = $startPos + $len
+
+		$flgs    = $r.ReadUInt8()
+		$tgLen   = $r.ReadUInt8()
+		$tgBytes    = $r.ReadBytes($tgLen)
+		$tg      = [System.Text.Encoding]::ASCII.GetString($tgBytes)
+
+		$remaining   = $endPos - $r.Position
+		$valueBytes  = $r.ReadBytes($remaining)
+		$val    = [System.Text.Encoding]::UTF8.GetString($valueBytes)
+
+		return [DnsCaaRecord]::new($flgs, $tg, $val)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8($this.Flags)
+
+		$tgBytes = [System.Text.Encoding]::ASCII.GetBytes($this.Tag)
+		$w.WriteUInt8([byte]$tgBytes.Length)
+		$w.WriteBytes($tgBytes)
+
+		$valueBytes = [System.Text.Encoding]::UTF8.GetBytes($this.Value)
+		$w.WriteBytes($valueBytes)
+
+		return $w.ToArray()
+	}
+
+	[bool] IsCritical()
+	{
+		return ($this.Flags -band 128) -ne 0
+	}
+}
+class DnsDnameRecord {
+	[string]$Target
+
+	DnsDnameRecord([string]$target)
+	{
+		$this.Target = $target
+	}
+
+	static [DnsDnameRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$name = $r.ReadName()
+		return [DnsDnameRecord]::new($name)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName($this.Target)
+		return $w.ToArray()
+	}
+}
+class DnsNaptrRecord {
+	[uint16]$Order            # Order of processing
+	[uint16]$Preference       # Preference within same order
+	[string]$Flags            # Flags (e.g., "S", "A", "U", "P")
+	[string]$Services         # Available services
+	[string]$Regexp           # Regular expression for rewriting
+	[string]$Replacement      # Replacement domain name
+
+	DnsNaptrRecord(
+		[uint16]$ord,
+		[uint16]$preference,
+		[string]$flags,
+		[string]$services,
+		[string]$regexp,
+		[string]$replacement
+	)
+	{
+		$this.Order = $ord
+		$this.Preference = $preference
+		$this.Flags = $flags
+		$this.Services = $services
+		$this.Regexp = $regexp
+		$this.Replacement = $replacement
+	}
+
+	static [string] ReadCharacterString([DnsBinaryReader]$r)
+	{
+		$len = $r.ReadUInt8()
+		if ($len -eq 0) { return '' }
+		$bytes = $r.ReadBytes($len)
+		return [System.Text.Encoding]::ASCII.GetString($bytes)
+	}
+
+	static [DnsNaptrRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$ord = $r.ReadUInt16BE()
+		$pref = $r.ReadUInt16BE()
+		$flgs = [DnsNaptrRecord]::ReadCharacterString($r)
+		$svcs = [DnsNaptrRecord]::ReadCharacterString($r)
+		$rgx = [DnsNaptrRecord]::ReadCharacterString($r)
+		$repl = $r.ReadName()
+
+		return [DnsNaptrRecord]::new(
+			$ord, $pref, $flgs,
+			$svcs, $rgx, $repl
+		)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt16BE($this.Order)
+		$w.WriteUInt16BE($this.Preference)
+
+		# Write flags as character string
+		$flagsBytes = [System.Text.Encoding]::ASCII.GetBytes($this.Flags)
+		$w.WriteUInt8([byte]$flagsBytes.Length)
+		$w.WriteBytes($flagsBytes)
+
+		# Write services as character string
+		$servicesBytes = [System.Text.Encoding]::ASCII.GetBytes($this.Services)
+		$w.WriteUInt8([byte]$servicesBytes.Length)
+		$w.WriteBytes($servicesBytes)
+
+		# Write regexp as character string
+		$regexpBytes = [System.Text.Encoding]::ASCII.GetBytes($this.Regexp)
+		$w.WriteUInt8([byte]$regexpBytes.Length)
+		$w.WriteBytes($regexpBytes)
+
+		# Write replacement domain name
+		$w.WriteName($this.Replacement)
+
+		return $w.ToArray()
+	}
+}
+class DnsSshfpRecord {
+	[byte]$Algorithm          # 1=RSA, 2=DSS, 3=ECDSA, 4=Ed25519
+	[byte]$FingerprintType    # 1=SHA-1, 2=SHA-256
+	[byte[]]$Fingerprint      # Public key fingerprint
+
+	DnsSshfpRecord([byte]$alg, [byte]$fpType, [byte[]]$fp)
+	{
+		$this.Algorithm = $alg
+		$this.FingerprintType = $fpType
+		$this.Fingerprint = $fp
+	}
+
+	static [DnsSshfpRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$startPos = $r.Position
+		$alg = $r.ReadUInt8()
+		$fpt = $r.ReadUInt8()
+		$remaining = $len - ($r.Position - $startPos)
+		$fp = $r.ReadBytes($remaining)
+
+		return [DnsSshfpRecord]::new($alg, $fpt, $fp)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8($this.Algorithm)
+		$w.WriteUInt8($this.FingerprintType)
+		$w.WriteBytes($this.Fingerprint)
+		return $w.ToArray()
+	}
+
+	[string]GetFingerprintHex()
+	{
+		return ($this.Fingerprint | ForEach-Object { $_.ToString('x2') }) -join ''
+	}
+}
+class DnsTlsaRecord {
+	[byte]$CertUsage           # 0-3: PKIX-TA, PKIX-EE, DANE-TA, DANE-EE
+	[byte]$Selector            # 0=Full cert, 1=SubjectPublicKeyInfo
+	[byte]$MatchingType        # 0=Full, 1=SHA-256, 2=SHA-512
+	[byte[]]$CertificateData   # Certificate association data
+
+	DnsTlsaRecord([byte]$usage, [byte]$sel, [byte]$matching, [byte[]]$data)
+	{
+		$this.CertUsage = $usage
+		$this.Selector = $sel
+		$this.MatchingType = $matching
+		$this.CertificateData = $data
+	}
+
+	static [DnsTlsaRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$startPos = $r.Position
+		$usage = $r.ReadUInt8()
+		$sel = $r.ReadUInt8()
+		$mtch = $r.ReadUInt8()
+		$remaining = $len - ($r.Position - $startPos)
+		$data = $r.ReadBytes($remaining)
+
+		return [DnsTlsaRecord]::new($usage, $sel, $mtch, $data)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8($this.CertUsage)
+		$w.WriteUInt8($this.Selector)
+		$w.WriteUInt8($this.MatchingType)
+		$w.WriteBytes($this.CertificateData)
+		return $w.ToArray()
+	}
+}
 class DnsDnskeyRecord {
 	[uint16]$Flags
 	[byte]  $Protocol
@@ -436,14 +744,15 @@ class DnsDnskeyRecord {
 		$this.KeyTag = [DnsDnskeyRecord]::ComputeKeyTag($flags, $proto, $alg, $key)
 	}
     
-	static [DnsDnskeyRecord] Parse([byte[]]$rdata) 
+	static [DnsDnskeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r        = [DnsBinaryReader]::new($rdata)
-		$flagsval = $r.ReadUInt16BE()
-		$protoVal = $r.ReadUInt8()
-		$algVal   = $r.ReadUInt8()
-		$keyVal   = $r.ReadBytes($rdata.Length - $r.Position)
-		return [DnsDnskeyRecord]::new($flagsval, $protoVal, $algVal, $keyVal)
+		$startPos = $r.Position
+		$flgs = $r.ReadUInt16BE()
+		$proto = $r.ReadUInt8()
+		$alg   = $r.ReadUInt8()
+		$remaining = $len - ($r.Position - $startPos)
+		$key   = $r.ReadBytes($remaining)
+		return [DnsDnskeyRecord]::new($flgs, $proto, $alg, $key)
 	}
 
 	static [uint16] ComputeKeyTag(
@@ -495,14 +804,15 @@ class DnsDsRecord {
 		$this.Digest     = $digest
 	}
 
-	static [DnsDsRecord] Parse([byte[]]$rdata) 
+	static [DnsDsRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r       = [DnsBinaryReader]::new($rdata)
-		$tagval  = $r.ReadUInt16BE()
-		$algVal  = $r.ReadUInt8()
-		$dtypeval = $r.ReadUInt8()
-		$digval  = $r.ReadBytes($rdata.Length - $r.Position)
-		return [DnsDsRecord]::new($tagval,$algVal,$dtypeval,$digval)
+		$startPos = $r.Position
+		$tag  = $r.ReadUInt16BE()
+		$alg  = $r.ReadUInt8()
+		$dtype = $r.ReadUInt8()
+		$remaining = $len - ($r.Position - $startPos)
+		$dig  = $r.ReadBytes($remaining)
+		return [DnsDsRecord]::new($tag,$alg,$dtype,$dig)
 	}
 
 	[byte[]]ToWire() 
@@ -553,16 +863,16 @@ class DnsRrsigRecord {
 		# RDATA begins here
 		$startPos = $r.Position
 
-		$typeCval  = $r.ReadUInt16BE()
-		$algVal    = $r.ReadUInt8()
-		$labelsval = $r.ReadUInt8()
-		$origval   = $r.ReadUInt32BE()
-		$expval    = $r.ReadUInt32BE()
-		$incval    = $r.ReadUInt32BE()
-		$tagval    = $r.ReadUInt16BE()
+		$typeC  = $r.ReadUInt16BE()
+		$alg    = $r.ReadUInt8()
+		$lbls = $r.ReadUInt8()
+		$orig   = $r.ReadUInt32BE()
+		$exp    = $r.ReadUInt32BE()
+		$inc    = $r.ReadUInt32BE()
+		$tag    = $r.ReadUInt16BE()
 
-		# SignerName may be compressed Ã¢â€ â€™ must use main reader
-		$signerval = $r.ReadName()
+		# SignerName may be compressed â†’ must use main reader
+		$signer = $r.ReadName()
 
 		# How many bytes have we consumed so far?
 		$bytesConsumed = $r.Position - $startPos
@@ -572,13 +882,13 @@ class DnsRrsigRecord {
 		if ($remaining -lt 0) 
 		{throw "RRSIG parse overran RDLENGTH: consumed $bytesConsumed of $len"}
 
-		$sigval = if ($remaining -gt 0) 
+		$sig = if ($remaining -gt 0) 
 		{$r.ReadBytes($remaining)}
 		else 
 		{[byte[]]@()}
 
 		return [DnsRrsigRecord]::new(
-			$typeCval,$algVal,$labelsval,$origval,$expval,$incval,$tagval,$signerval,$sigval
+			$typeC,$alg,$lbls,$orig,$exp,$inc,$tag,$signer,$sig
 		)
 	}
 
@@ -624,33 +934,34 @@ class DnsNsecRecord {
 		return ($labels -join '.')
 	}
 
-	static [DnsNsecRecord] Parse([byte[]]$rdata) 
+	static [DnsNsecRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r        = [DnsBinaryReader]::new($rdata)
-		$nextval = ([DnsNsecRecord]::ReadUncompressedName($r)).ToLowerInvariant()
-		$typesval = New-Object -TypeName System.Collections.Generic.List[int]
+		$startPos = $r.Position
+		$endPos   = $startPos + $len
+		$next = ([DnsNsecRecord]::ReadUncompressedName($r)).ToLowerInvariant()
+		$typs = New-Object -TypeName System.Collections.Generic.List[int]
 
-		while ($r.Position -lt $r.Buffer.Length) 
+		while ($r.Position -lt $endPos) 
 		{
-			$blockval = $r.ReadUInt8()
-			$lenval   = $r.ReadUInt8()
+			$block = $r.ReadUInt8()
+			$len   = $r.ReadUInt8()
 
-			if ($lenval -lt 1 -or $lenval -gt 32) 
-			{throw "Invalid NSEC bitmap length: $lenval"}
+			if ($len -lt 1 -or $len -gt 32) 
+			{throw "Invalid NSEC bitmap length: $len"}
 
-			$bitsval  = $r.ReadBytes($lenval)
+			$bits  = $r.ReadBytes($len)
 
-			for ($b = 0; $b -lt $bitsval.Length; $b++) 
+			for ($b = 0; $b -lt $bits.Length; $b++) 
 			{
 				for ($bit = 0; $bit -lt 8; $bit++) 
 				{
-					if ($bitsval[$b] -band (1 -shl (7-$bit))) 
-					{$null = $typesval.Add($blockval * 256 + $b*8 + $bit)}
+					if ($bits[$b] -band (1 -shl (7-$bit))) 
+					{$null = $typs.Add($block * 256 + $b*8 + $bit)}
 				}
 			}
 		}
 
-		return [DnsNsecRecord]::new($nextval, $typesval.ToArray())
+		return [DnsNsecRecord]::new($next, $typs.ToArray())
 	}
 
 	[byte[]]ToWire() 
@@ -701,56 +1012,88 @@ class DnsNsec3Record {
 
 	DnsNsec3Record(
 		[byte]$alg,[byte]$flags,[uint16]$iter,
-		[byte[]]$salt,[byte[]]$ownerHash,[byte[]]$nextHash,[int[]]$types
+		[byte[]]$salt,[byte[]]$oHash,[byte[]]$nextHash,[int[]]$types
 	)
 	{
 		$this.HashAlgorithm = $alg
 		$this.Flags         = $flags
 		$this.Iterations    = $iter
 		$this.Salt          = $salt
-		$this.OwnerHash     = $ownerHash
+		$this.OwnerHash     = $oHash
 		$this.NextHash      = $nextHash
 		$this.Types         = $types
 	}
 
-	static [DnsNsec3Record] Parse([byte[]]$rdata, [byte[]]$ownerHash)
+	static [byte[]] Base32HexDecode([string]$encoded)
 	{
-		$r          = [DnsBinaryReader]::new($rdata)
-		$algVal     = $r.ReadUInt8()
-		$flagsval   = $r.ReadUInt8()
-		$iterval    = $r.ReadUInt16BE()
-		$saltLenval = $r.ReadUInt8()
-		$saltval    = if ($saltLenval -gt 0) 
-		{$r.ReadBytes($saltLenval)}
-		else 
+		# RFC 4648 Base32hex alphabet: 0-9, A-V (uppercase)
+		$alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUV'
+		$encoded = $encoded.ToUpper().Replace('=', '')
+
+		if ($encoded.Length -eq 0) { return [byte[]]@() }
+
+		$bits = ''
+		foreach ($char in $encoded.ToCharArray())
+		{
+			$val = $alphabet.IndexOf($char)
+			if ($val -eq -1) { throw "Invalid Base32hex character: $char" }
+			$bits += [Convert]::ToString($val, 2).PadLeft(5, '0')
+		}
+
+		$bytes = [System.Collections.Generic.List[byte]]::new()
+		for ($i = 0; $i -lt $bits.Length - 7; $i += 8)
+		{
+			$byteStr = $bits.Substring($i, 8)
+			$bytes.Add([Convert]::ToByte($byteStr, 2))
+		}
+
+		return [byte[]]$bytes.ToArray()
+	}
+
+	static [DnsNsec3Record] Parse([DnsBinaryReader]$r, [int]$len, [string]$ownerName)
+	{
+		$startPos   = $r.Position
+		$endPos     = $startPos + $len
+
+		# Extract owner hash from base32hex-encoded first label of owner name
+		$firstLabel = $ownerName.Split('.')[0].ToUpper()
+		$oHash = [DnsNsec3Record]::Base32HexDecode($firstLabel)
+
+		$alg     = $r.ReadUInt8()
+		$flgs   = $r.ReadUInt8()
+		$iter    = $r.ReadUInt16BE()
+		$saltLen = $r.ReadUInt8()
+		$slt    = if ($saltLen -gt 0)
+		{$r.ReadBytes($saltLen)}
+		else
 		{[byte[]]@()}
 
-		$hashLenval  = $r.ReadUInt8()
-		$nextHashval = $r.ReadBytes($hashLenval)
+		$hashLen  = $r.ReadUInt8()
+		$nxtHash = $r.ReadBytes($hashLen)
 
-		$typesval = New-Object -TypeName System.Collections.Generic.List[int]
-		while ($r.Position -lt $r.Buffer.Length) 
+		$typs = New-Object -TypeName System.Collections.Generic.List[int]
+		while ($r.Position -lt $endPos) 
 		{
-			$blockval = $r.ReadUInt8()
-			$lenval   = $r.ReadUInt8()
-			if ($lenval -lt 1 -or $lenval -gt 32) 
-			{throw "Invalid NSEC3 bitmap length: $lenval"}
-			$bitsval  = $r.ReadBytes($lenval)
-			for ($b = 0; $b -lt $bitsval.Length; $b++) 
+			$block = $r.ReadUInt8()
+			$len   = $r.ReadUInt8()
+			if ($len -lt 1 -or $len -gt 32) 
+			{throw "Invalid NSEC3 bitmap length: $len"}
+			$bits  = $r.ReadBytes($len)
+			for ($b = 0; $b -lt $bits.Length; $b++) 
 			{
 				for ($bit = 0; $bit -lt 8; $bit++) 
 				{
-					if ($bitsval[$b] -band (1 -shl (7-$bit))) 
-					{$null = $typesval.Add($blockval * 256 + $b*8 + $bit)}
+					if ($bits[$b] -band (1 -shl (7-$bit))) 
+					{$null = $typs.Add($block * 256 + $b*8 + $bit)}
 				}
 			}
 		}
 
 		return [DnsNsec3Record]::new(
-			$algVal,$flagsval,$iterval,$saltval,
-			$ownerHash,          # <-- NEW
-			$nextHashval,
-			$typesval.ToArray()
+			$alg,$flgs,$iter,$slt,
+			$oHash,
+			$nxtHash,
+			$typs.ToArray()
 		)
 	}
     
@@ -838,7 +1181,7 @@ class DnsResourceRecord {
 		$rdlengthValue = $r.ReadUInt16BE()
 		# Save the position 
 		$start = $r.Position
-		$objValue = [DnsResourceRecord]::ParseRDataTyped($typeValue, $r, $rdlengthValue)
+		$objValue = [DnsResourceRecord]::ParseRDataTyped($typeValue, $r, $rdlengthValue, $nameValue)
 		$r.Position = $start + $rdlengthValue
 		$rdataValue = $r.Buffer[$start..($start + $rdlengthValue - 1)]
 
@@ -852,32 +1195,48 @@ class DnsResourceRecord {
 		)
 	}
 
-	static [object] ParseRDataTyped([uint16]$type, [DnsBinaryReader]$r, [int]$len) 
+	static [object] ParseRDataTyped([uint16]$type, [DnsBinaryReader]$r, [int]$len, [string]$ownerName) 
 	{
 		switch ($type) {
-			1  
+			1
 			{return [DnsARecord]::Parse($r, $len)}
-			28 
+			2
+			{return [DnsNsRecord]::Parse($r, $len)}
+			28
 			{return [DnsAaaaRecord]::Parse($r, $len)}
-			5  
+			5
 			{return [DnsCnameRecord]::Parse($r, $len)}
-			15 
+			6
+			{return [DnsSoaRecord]::Parse($r, $len)}
+			12
+			{return [DnsPtrRecord]::Parse($r, $len)}
+			15
 			{return [DnsMxRecord]::Parse($r, $len)}
 			16 
 			{return [DnsTxtRecord]::Parse($r, $len)}
-			33 
+			33
 			{return [DnsSrvRecord]::Parse($r, $len)}
-			48 
+			35
+			{return [DnsNaptrRecord]::Parse($r, $len)}
+			39
+			{return [DnsDnameRecord]::Parse($r, $len)}
+			48
 			{return [DnsDnskeyRecord]::Parse($r, $len)}
-			43 
+			43
 			{return [DnsDsRecord]::Parse($r, $len)}
-			46 
+			44
+			{return [DnsSshfpRecord]::Parse($r, $len)}
+			46
 			{return [DnsRrsigRecord]::Parse($r, $len)}
-			47 
+			47
 			{return [DnsNsecRecord]::Parse($r, $len)}
-			50 
-			{return [DnsNsec3Record]::Parse($r, $len)}
-			default 
+			50
+			{return [DnsNsec3Record]::Parse($r, $len, $ownerName)}
+			52
+			{return [DnsTlsaRecord]::Parse($r, $len)}
+			257
+			{return [DnsCaaRecord]::Parse($r, $len)}
+			default
 			{return $null}
 		}
 		return $null
@@ -937,18 +1296,20 @@ class DnsOptRecord {
 		if ($type -ne 41) 
 		{throw 'Invalid OPT TYPE'}
 
-		$udpSizeval  = $r.ReadUInt16BE()
-		$extRcodeval = $r.ReadUInt8()
-		$versionval  = $r.ReadUInt8()
-		$flagsval    = $r.ReadUInt16BE()
-		$rdlenval    = $r.ReadUInt16BE()
-		$optsval     = if ($rdlenval -gt 0) 
-		{$r.ReadBytes($rdlenval)}
-		else 
-		{@()}
+		$udp  = $r.ReadUInt16BE()
+		$rcode = $r.ReadUInt8()
+		$ver  = $r.ReadUInt8()
+		$flgs    = $r.ReadUInt16BE()
+		$rdlen = $r.ReadUInt16BE()
+		[byte[]]$opts = $null
+		if ($rdlen -gt 0) {
+			$opts = $r.ReadBytes($rdlen)
+		} else {
+			$opts = [byte[]]@()
+		}
 
 		return [DnsOptRecord]::new(
-			$udpSizeval, $extRcodeval, $versionval, $flagsval, $optsval
+			$udp, $rcode, $ver, $flgs, $opts
 		)
 	}
 
@@ -984,68 +1345,77 @@ class DnsPacket {
 	static [DnsPacket] Parse([byte[]]$packetBytes) 
 	{
 		$r = [DnsBinaryReader]::new($packetBytes)
-		$pktval = [DnsPacket]::new()
-		$pktval.Header = [DnsHeader]::Parse($r)
+		$pkt = [DnsPacket]::new()
+		$pkt.Header = [DnsHeader]::Parse($r)
 
-		for ($i = 0; $i -lt $pktval.Header.QdCount; $i++) 
-		{$null = $pktval.Questions.Add([DnsQuestion]::Parse($r))}
+		for ($i = 0; $i -lt $pkt.Header.QdCount; $i++) 
+		{$null = $pkt.Questions.Add([DnsQuestion]::Parse($r))}
 
-		for ($i = 0; $i -lt $pktval.Header.AnCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.AnCount; $i++) 
 		{
 			if ($r.Position -ge $r.Buffer.Length) 
 			{throw 'DNS header ANCOUNT exceeds packet length'}
-			$null = $pktval.Answers.Add([DnsResourceRecord]::Parse($r))
+			$null = $pkt.Answers.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		for ($i = 0; $i -lt $pktval.Header.NsCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.NsCount; $i++) 
 		{
 			if ($r.Position -ge $r.Buffer.Length) 
 			{throw 'DNS header NSCOUNT exceeds packet length'}
-			$null = $pktval.Authority.Add([DnsResourceRecord]::Parse($r))
+			$null = $pkt.Authority.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		for ($i = 0; $i -lt $pktval.Header.ArCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.ArCount; $i++)
 		{
 			$saved = $r.Position
-			$r.ReadName()
-			$type = $r.ReadUInt16BE()
+
+			# OPT records always have name = root (single 0x00 byte)
+			# Check the first byte to determine if this might be an OPT record
+			$firstByte = $r.ReadUInt8()
 			$r.Position = $saved
 
-			if ($type -eq 41) 
+			# If first byte is 0x00, peek at the type to confirm it's OPT
+			if ($firstByte -eq 0)
 			{
-				if ($pktval.Opt) 
-				{throw 'Multiple OPT records not allowed'}
-				$pktval.Opt = [DnsOptRecord]::Parse($r)
+				$r.Position = $saved + 1  # Skip the 0x00 name
+				$type = $r.ReadUInt16BE()
+				$r.Position = $saved
+
+				if ($type -eq 41)
+				{
+					if ($pkt.Opt)
+					{throw 'Multiple OPT records not allowed'}
+					$pkt.Opt = [DnsOptRecord]::Parse($r)
+					continue
+				}
 			}
-			else 
-			{$null = $pktval.Additional.Add([DnsResourceRecord]::Parse($r))}
+
+			# Not an OPT record, parse as regular resource record
+			$null = $pkt.Additional.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		return $pktval
+		return $pkt
 	}
 
-	[byte[]] ToArray() 
+	[byte[]] ToArray()
 	{
 		$w = [DnsBinaryWriter]::new()
 
-		$optCount = if ($this.Opt) 
-		{1}
-		else 
-		{0}
+		$optCount = if ($this.Opt) {1} else {0}
 		$this.Header.ArCount = $this.Additional.Count + $optCount
 
 		$this.Header.Write($w)
 
-		foreach ($q in $this.Questions)  
+		foreach ($q in $this.Questions)
 		{$q.Write($w)}
-		foreach ($rr in $this.Answers)   
+		foreach ($rr in $this.Answers)
 		{$rr.Write($w)}
-		foreach ($rr in $this.Authority) 
+		foreach ($rr in $this.Authority)
 		{$rr.Write($w)}
 		foreach ($rr in $this.Additional)
 		{$rr.Write($w)}
 
-		if ($this.Opt) 
+		if ($this.Opt)
 		{$this.Opt.Write($w)}
 
 		return $w.ToArray()
@@ -1061,47 +1431,48 @@ class DnsDotClient {
 		$this.Port   = $port
 	}
 
-	[DnsPacket] Query([DnsPacket]$packet) 
+	[DnsPacket] Query([DnsPacket]$packet)
 	{
-		$bytes = ConvertTo-DnsWireBytes -packet $packet
+		$queryBytes = $packet.ToArray()
 
-		$respBytes = Invoke-DnsTransportSafe -Context 'DoT query' -Operation {
+		try {
 			$tcp = New-Object -TypeName System.Net.Sockets.TcpClient
 			$tcp.Connect($this.Server, $this.Port)
 
 			$ssl = New-Object -TypeName System.Net.Security.SslStream -ArgumentList (
-				$tcp.GetStream(), 
-				$false, 
+				$tcp.GetStream(),
+				$false,
 				{param($s, $c, $ch, $e) return $true}
 			)
 			$ssl.AuthenticateAsClient($this.Server)
 
-			$lenBytes = [BitConverter]::GetBytes([uint16]$bytes.Length)
-			if ([BitConverter]::IsLittleEndian) 
+			$lenBytes = [BitConverter]::GetBytes([uint16]$queryBytes.Length)
+			if ([BitConverter]::IsLittleEndian)
 			{[Array]::Reverse($lenBytes)}
 
 			$ssl.Write($lenBytes, 0, 2)
-			$ssl.Write($bytes, 0, $bytes.Length)
+			$ssl.Write($queryBytes, 0, $queryBytes.Length)
 			$ssl.Flush()
 
 			$lenBuf = New-Object -TypeName byte[] -ArgumentList 2
 			$null = $ssl.Read($lenBuf, 0, 2)
-			if ([BitConverter]::IsLittleEndian) 
+			if ([BitConverter]::IsLittleEndian)
 			{[Array]::Reverse($lenBuf)}
 			$respLen = [BitConverter]::ToUInt16($lenBuf, 0)
 
 			$resp = New-Object -TypeName byte[] -ArgumentList $respLen
 			$read = 0
-			while ($read -lt $respLen) 
+			while ($read -lt $respLen)
 			{$read += $ssl.Read($resp, $read, $respLen - $read)}
 
 			$ssl.Close()
 			$tcp.Close()
 
-			return $resp
+			return [DnsPacket]::Parse($resp)
 		}
-
-		return ConvertFrom-DnsWireBytes -bytes $respBytes
+		catch {
+			throw "DoT query failed: $($_.Exception.Message)"
+		}
 	}
 }
 class DnsDohClient {
@@ -1110,23 +1481,25 @@ class DnsDohClient {
 	DnsDohClient([string]$endpoint) 
 	{$this.Endpoint = $endpoint}
 
-	[DnsPacket] Query([DnsPacket]$packet) 
+	[DnsPacket] Query([DnsPacket]$packet)
 	{
-		$bytes = ConvertTo-DnsWireBytes -packet $packet
+		$queryBytes = $packet.ToArray()
 
-		$respBytes = Invoke-DnsTransportSafe -Context 'DoH query' -Operation {
-			$client = New-Object -TypeName System.Net.Http.HttpClient
-			$content = New-Object -TypeName System.Net.Http.ByteArrayContent -ArgumentList ($bytes)
+		try {
+			$httpClient = New-Object -TypeName System.Net.Http.HttpClient
+			$content = New-Object -TypeName System.Net.Http.ByteArrayContent -ArgumentList (,$queryBytes)
 			$content.Headers.ContentType = 'application/dns-message'
 
-			$response = $client.PostAsync($this.Endpoint, $content).Result
-			if (-not $response.IsSuccessStatusCode) 
+			$response = $httpClient.PostAsync($this.Endpoint, $content).Result
+			if (-not $response.IsSuccessStatusCode)
 			{throw "HTTP $($response.StatusCode)"}
 
-			return $response.Content.ReadAsByteArrayAsync().Result
+			$respBytes = $response.Content.ReadAsByteArrayAsync().Result
+			return [DnsPacket]::Parse($respBytes)
 		}
-
-		return ConvertFrom-DnsWireBytes -bytes $respBytes
+		catch {
+			throw "DoH query failed: $($_.Exception.Message)"
+		}
 	}
 }
 
@@ -1142,106 +1515,163 @@ $PSD1Path         = Join-Path -Path $ModuleScriptRoot -ChildPath ('{0}.psd1' -f 
 # 1. Support functions
 # ============================================================
 
-function Get-Psd1Data {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [Microsoft.PowerShell.DesiredStateConfiguration.ArgumentToConfigurationDataTransformation()]
-        [Hashtable] $PathToPsd1file
-    )
-    $PathToPsd1file
+function Get-Psd1Data 
+{
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)]
+		[Microsoft.PowerShell.DesiredStateConfiguration.ArgumentToConfigurationDataTransformation()]
+		[Hashtable] $PathToPsd1file
+	)
+	$PathToPsd1file
 }
 
-function Initialize-Folders {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [Array] $Folders
-    )
+function Initialize-Folders 
+{
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)]
+		[Array] $Folders
+	)
 
-    foreach ($Item in $Folders) {
-        $Path = Join-Path -Path $ModuleScriptRoot -ChildPath $Item
-        if (-not (Test-Path -Path $Path)) {
-            $null = New-Item -Path $Path -ItemType Directory
-        }
-    }
+	foreach ($Item in $Folders) 
+	{
+		$Path = Join-Path -Path $ModuleScriptRoot -ChildPath $Item
+		if (-not (Test-Path -Path $Path)) 
+		{$null = New-Item -Path $Path -ItemType Directory}
+	}
 }
 
-function Publish-MyEnvironment {
-    [CmdletBinding()]
-    param(
-        [String] $Option = $null
-    )
+function Publish-MyEnvironment 
+{
+	[CmdletBinding()]
+	param(
+		[String] $Option = $null
+	)
 
-    return  # keeping your original short-circuit
+	foreach ($Item in ($PSD1Data.PrivateData.ModuleVars[$Option].keys | Sort-Object))
+	{
+		$FilePath = Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\{1}' -f $Option, $PSD1Data.PrivateData.ModuleVars[$Option][$Item]) -ErrorAction Stop
+		If (Test-Path -Path $FilePath)
+		{
+			# Dot-source the DefineVariables file to load its variables
+			. $FilePath
+		}
+	}
 
-    if ($MyVariables = Get-ChildItem -Path (Join-Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-Variables*.ps1' -f $Option)) -ErrorAction Ignore) {
-        foreach ($Item in ($MyVariables.FullName | Sort-Object)) { . $Item }
-    }
-
-    if ($MyCustomXML = Get-ChildItem -Path (Join-Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-CustomXML.ps1' -f $Option)) -ErrorAction Ignore) {
-        foreach ($Item in ($MyCustomXML.FullName | Sort-Object)) { . $Item }
-    }
+	if ($MyCustomXML = Get-ChildItem -Path (Join-Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-CustomXML.ps1' -f $Option)) -ErrorAction Ignore) 
+	{
+		foreach ($Item in ($MyCustomXML.FullName | Sort-Object)) 
+		{. $Item}
+	}
 }
 
-function Publish-CustomXML {
-    foreach ($Item in ($MyCustomXML.GetEnumerator() | Sort-Object -Property key).Name) {
-        $XMLItem = Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\{1}' -f $Option, $MyCustomXML[$Item].file)
-        if (Test-Path -Path $XMLItem) {
-            switch ($MyCustomXML[$Item].Action) {
-                'Update-FormatData' {
-                    switch ($MyCustomXML[$Item].Option) {
-                        'Prependpath' { Update-FormatData -PrependPath $XMLItem -ErrorAction Stop }
-                        'Appendpath'  { Update-FormatData -AppendPath  $XMLItem -ErrorAction Stop }
-                    }
-                }
-                default {
-                    "Unknown item in `$MyCustomXML: [$Item] Option: [$($MyCustomXML[$Item].Option)]" | Write-Warning
-                }
-            }
-        }
-    }
+function Publish-CustomXML 
+{
+	foreach ($Item in ($MyCustomXML.GetEnumerator() | Sort-Object -Property key).Name) 
+	{
+		$XMLItem = Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\{1}' -f $Option, $MyCustomXML[$Item].file)
+		if (Test-Path -Path $XMLItem) 
+		{
+			switch ($MyCustomXML[$Item].Action) {
+				'Update-FormatData' 
+				{
+					switch ($MyCustomXML[$Item].Option) {
+						'Prependpath' 
+						{Update-FormatData -PrependPath $XMLItem -ErrorAction Stop}
+						'Appendpath'  
+						{Update-FormatData -AppendPath  $XMLItem -ErrorAction Stop}
+					}
+				}
+				default 
+				{"Unknown item in `$MyCustomXML: [$Item] Option: [$($MyCustomXML[$Item].Option)]" | Write-Warning}
+			}
+		}
+	}
 }
 
-function Publish-Variables {
-    try {
-        foreach ($VarSet in ($MyVars.GetEnumerator() | Sort-Object -Property key).Name) {
-            foreach ($Item in ($MyVars[$VarSet].GetEnumerator() | Sort-Object -Property key).Name) {
-                $Params = @{
-                    Name   = $Item
-                    Value  = $MyVars[$VarSet][$Item].Value
-                    Option = $MyVars[$VarSet][$Item].Option
-                    Scope  = $MyVars[$VarSet][$Item].Scope
-                }
-
-                New-Variable @Params -ErrorAction Stop
-                Export-ModuleMember -Variable $Item -ErrorAction Stop
-            }
-        }
-    }
-    catch {
-        Write-Warning "Variable [$Item] failed to create"
-    }
+Function Publish-Variables
+{
+	<#
+			.SYNOPSIS
+			Takes the definitions in $MyVars and processes them into the variables defined.
+        
+			.DESCRIPTION
+			As Above
+        
+			.EXAMPLE
+			Publish-Variables is called from the file Define-Variables.ps1 which is executed as part
+			of this psm1 file when the module is initialised.
+        
+			.EXAMPLE
+			Publish-Variables
+	#>
+	Try
+	{
+		ForEach ($VarSet in ($MyVars.GetEnumerator() | Sort-Object -Property key).Name)
+		{
+			ForEach ($Item in ($MyVars[$VarSet].GetEnumerator() | Sort-Object -Property key).Name)
+			{
+				$Params = @{
+					Name   = $null
+					Value  = $null
+					Option = $null
+					Scope  = $null
+				}
+				If (Test-Path -Path ('Variable:{0}:{1}' -f $MyVars[$VarSet][$Item].Scope, $Item))
+				{
+					$Params = @{
+						Name  = $Item
+						Scope = $MyVars[$VarSet][$Item].Scope
+					}
+					If ($Params.Scope -inotmatch $VOConstant)
+					{Remove-Variable @Params -Force}
+				}
+				$Params = @{
+					Name   = $Item
+					Value  = $MyVars[$VarSet][$Item].Value
+					Option = $MyVars[$VarSet][$Item].Option
+					Scope  = $MyVars[$VarSet][$Item].Scope
+				}
+				New-Variable @Params -ErrorAction Stop
+				Export-ModuleMember -Variable $Item -ErrorAction Stop
+				$var = Get-Variable -Name VInfoOn -Scope Local -ErrorAction SilentlyContinue
+				if ($var -and $var.Value -is [bool] -and $var.Value) 
+				{
+					{
+						$Msg = 'Variable:[{0}] created Value: [{1}]' -f $Item, $Params.Value
+						Write-Information -MessageData $Msg -InformationAction Continue
+					}
+				}
+			}
+		}
+	}
+	Catch
+	{
+		$Msg = 'Variable:[{0}] Failed to create Value: [{1}]' -f $Item, $Params.Value
+		Write-Information -MessageData $Msg -InformationAction Continue
+	}
 }
 
 # ============================================================
 # 2. MAIN MODULE INITIALIZATION
 # ============================================================
 
-try {
+try 
+{
 	Initialize-Folders -Folders @(
-		'Classes\BinaryInfrastructure',
-		'Classes\Core',
-		'Classes\Basic',
-		'Classes\DNSSEC',
-		'Classes\Resource',
-		'Classes\EDNS-OPT',
-		'Classes\DNS',
-		'Classes\Transport',
-		'Helpers',
-		'Functions',
-		'FunctionsLinux',
-		'FunctionsWindows',
+		'Classes\BinaryInfrastructure', 
+		'Classes\Core', 
+		'Classes\Basic', 
+		'Classes\DNSSEC', 
+		'Classes\Resource', 
+		'Classes\EDNS-OPT', 
+		'Classes\DNS', 
+		'Classes\Transport', 
+		'Helpers', 
+		'Functions', 
+		'FunctionsLinux', 
+		'FunctionsWindows', 
 		'FunctionsMacOS'
 	)
 
@@ -1249,57 +1679,129 @@ try {
 
 	Publish-MyEnvironment
 
-	# Load common functions
-	$Exclude = @('Define-CustomXML|Define-Variables|\.zip$')
-	$CommonFunctions = Get-ChildItem -Path (Join-Path $ModuleScriptRoot -ChildPath 'Functions\*.ps1') |
-	Where-Object { $_.Name -inotmatch $Exclude }
+	# Check if we should export all functions (for testing)
+	$ExportAll = ($env:DNSTOOLS_EXPORT_ALL -eq '1')
 
-	foreach ($Item in $CommonFunctions) {
-		. $Item.FullName
-		Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+	# Load common functions
+	$VarDefFiles = @($PSD1Data.PrivateData.ModuleVars[''].Values)
+	$Exclude = @('Define-CustomXML|\.zip$')
+	$MyPath = (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions\*{0}' -f $StrExtPS1) -ErrorAction Stop)
+	$CommonFunctions = (Get-ChildItem -Path $MyPath -ErrorAction stop | Where-Object {$_.Name -inotmatch $Exclude -and $_.Name -notin $VarDefFiles} ) |
+	Where-Object {$_.Name -inotmatch $Exclude}
+
+	foreach ($Item in $CommonFunctions)
+	{
+		If ($FInfoOn)
+		{
+			$Msg = 'Processing Function:[{0}]' -f $Item.FullName
+			Write-Information -MessageData $Msg -InformationAction Continue
+		}
+				. $Item.FullName
+		if (-not (Get-Command $Item.BaseName -CommandType Function -ErrorAction SilentlyContinue))
+		{Write-Host "Function [$($Item.BaseName)] was NOT created by file [$($Item.Name)]"}
+		else
+		{
+			$funcName = $Item.BaseName
+			# Export all if env var set, otherwise check export table
+			$shouldExport = $ExportAll -or $true  # Default to export if not in table
+			if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+			{$shouldExport = $script:FunctionExportTable[$funcName]}
+			if ($shouldExport) 
+			{Export-ModuleMember -Function $funcName -ErrorAction Stop}
+		}
 	}
 
-	# OS-specific functions
-	switch ($true) {
-
-		($IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) {
+	# OS-specific functions 2=Windows 4=Linux 6=MacOS
+	switch ([System.Environment]::OSVersion.Platform.value__) {
+		2
+		{
 			Publish-MyEnvironment -Option 'Windows'
+			$VarDefFiles = @($PSD1Data.PrivateData.ModuleVars['Windows'].Values)
+			$Exclude = @('Define-CustomXML|{0}$' -f $StrExtZip)
 			$WinFunctions = Get-ChildItem (Join-Path $ModuleScriptRoot -ChildPath 'FunctionsWindows\*.ps1') |
-			Where-Object { $_.Name -inotmatch $Exclude }
+			Where-Object {$_.Name -inotmatch $Exclude -and $_.Name -notin $VarDefFiles}
 
-			foreach ($Item in $WinFunctions) {
-				. $Item.FullName
-				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+			foreach ($Item in $WinFunctions)
+			{
+				If ($FInfoOn)
+				{
+					$Msg = 'Processing Function:[{0}]' -f $Item.FullName
+					Write-Information -MessageData $Msg -InformationAction Continue
+				}
+								. $Item.FullName
+				if (-not (Get-Command $Item.BaseName -CommandType Function -ErrorAction SilentlyContinue))
+				{Write-Host "Function [$($Item.BaseName)] was NOT created by file [$($Item.Name)]"}
+				else
+				{
+					$funcName = $Item.BaseName
+					$shouldExport = $ExportAll -or $true
+					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+					{$shouldExport = $script:FunctionExportTable[$funcName]}
+					if ($shouldExport) 
+					{Export-ModuleMember -Function $funcName -ErrorAction Stop}
+				}
 			}
 		}
-
-		$IsLinux {
+		4
+		{
 			Publish-MyEnvironment -Option 'Linux'
 			$LinFunctions = Get-ChildItem (Join-Path $ModuleScriptRoot -ChildPath 'FunctionsLinux\*.ps1') |
-			Where-Object { $_.Name -inotmatch $Exclude }
+			Where-Object {$_.Name -inotmatch $Exclude}
 
-			foreach ($Item in $LinFunctions) {
-				. $Item.FullName
-				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+			foreach ($Item in $LinFunctions)
+			{
+				If ($FInfoOn)
+				{
+					$Msg = 'Processing Function:[{0}]' -f $Item.FullName
+					Write-Information -MessageData $Msg -InformationAction Continue
+				}
+								. $Item.FullName
+				if (-not (Get-Command $Item.BaseName -CommandType Function -ErrorAction SilentlyContinue))
+				{Write-Host "Function [$($Item.BaseName)] was NOT created by file [$($Item.Name)]"}
+				else
+				{
+					$funcName = $Item.BaseName
+					$shouldExport = $ExportAll -or $true
+					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+					{$shouldExport = $script:FunctionExportTable[$funcName]}
+					if ($shouldExport) 
+					{Export-ModuleMember -Function $funcName -ErrorAction Stop}
+				}
 			}
 		}
-
-		$IsMacOS {
+		6
+		{
 			Publish-MyEnvironment -Option 'MacOS'
 			$MacFunctions = Get-ChildItem (Join-Path $ModuleScriptRoot -ChildPath 'FunctionsMacOS\*.ps1') |
-			Where-Object { $_.Name -inotmatch $Exclude }
+			Where-Object {$_.Name -inotmatch $Exclude}
 
-			foreach ($Item in $MacFunctions) {
-				. $Item.FullName
-				Export-ModuleMember -Function $Item.BaseName -ErrorAction Stop
+			foreach ($Item in $MacFunctions)
+			{
+				If ($FInfoOn)
+				{
+					$Msg = 'Processing Function:[{0}]' -f $Item.FullName
+					Write-Information -MessageData $Msg -InformationAction Continue
+				}
+								. $Item.FullName
+				if (-not (Get-Command $Item.BaseName -CommandType Function -ErrorAction SilentlyContinue))
+				{Write-Host "Function [$($Item.BaseName)] was NOT created by file [$($Item.Name)]"}
+				else
+				{
+					$funcName = $Item.BaseName
+					$shouldExport = $ExportAll -or $true
+					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+					{$shouldExport = $script:FunctionExportTable[$funcName]}
+					if ($shouldExport) 
+					{Export-ModuleMember -Function $funcName -ErrorAction Stop}
+				}
 			}
 		}
-		default {
-			throw 'Operating System Unknown'
-		}
+		default 
+		{throw 'Operating System Unknown'}
 	}
 }
-catch {
-		Write-Warning "Module initialization failed: $($_.Exception.Message)"
-		throw "Unable to initialise module: $ModuleName"
+catch 
+{
+	Write-Warning "Module initialization failed: $($_.Exception.Message)"
+	throw "Unable to initialise module: $ModuleName"
 }

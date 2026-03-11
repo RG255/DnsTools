@@ -1,14 +1,12 @@
-﻿# Tests/10-DoT.Tests.ps1
+# Tests/10-DoT.Tests.ps1
 # DNS-over-TLS (DoT) Transport Tests
 
 using module dnstools
 
 Describe "DnsDotClient - DNS-over-TLS Transport" {
 
-    $fixtures = Join-Path $PSScriptRoot "Fixtures"
-
     It "Loads dot-simple-response.bin fixture" {
-        $path = Join-Path $fixtures "dot-simple-response.bin"
+        $path = Join-Path $PSScriptRoot "Fixtures/dot-simple-response.bin"
         Test-Path $path | Should -BeTrue
 
         $bytes = [IO.File]::ReadAllBytes($path)
@@ -16,7 +14,7 @@ Describe "DnsDotClient - DNS-over-TLS Transport" {
     }
 
     It "Parses a DoT response using ConvertFrom-DnsWireBytes" {
-        $path = Join-Path $fixtures "dot-simple-response.bin"
+        $path = Join-Path $PSScriptRoot/Fixtures "dot-simple-response.bin"
         $bytes = [IO.File]::ReadAllBytes($path)
 
         $pkt = ConvertFrom-DnsWireBytes -Bytes $bytes
@@ -41,7 +39,7 @@ Describe "DnsDotClient - DNS-over-TLS Transport" {
         }
 
         It "Returns a parsed DNS packet from a simulated DoT client" {
-            $path = Join-Path $fixtures "dot-simple-response.bin"
+            $path = Join-Path $PSScriptRoot/Fixtures "dot-simple-response.bin"
             $bytes = [IO.File]::ReadAllBytes($path)
 
             $client = [FakeDotClient]::new($bytes)
@@ -60,20 +58,18 @@ Describe "DnsDotClient - DNS-over-TLS Transport" {
     Context "Error Handling" {
 
         It "Invoke-DnsTransportSafe wraps exceptions with context" {
-            $script = {
+            {
                 Invoke-DnsTransportSafe -Context "DoT test" -Operation {
                     throw "boom"
                 }
-            }
-
-            { & $script } | Should -Throw -ErrorMessage "*DoT test failed: boom*"
+            } | Should -Throw -ExpectedMessage "*DoT test failed: boom*"
         }
     }
 
     Context "Large DoT Response" {
 
         It "Parses dot-large-response.bin with multiple answers" {
-            $path = Join-Path $fixtures "dot-large-response.bin"
+            $path = Join-Path $PSScriptRoot/Fixtures "dot-large-response.bin"
             $bytes = [IO.File]::ReadAllBytes($path)
 
             $pkt = ConvertFrom-DnsWireBytes -Bytes $bytes

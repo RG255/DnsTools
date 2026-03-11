@@ -18,68 +18,77 @@ class DnsPacket {
 	static [DnsPacket] Parse([byte[]]$packetBytes) 
 	{
 		$r = [DnsBinaryReader]::new($packetBytes)
-		$pktval = [DnsPacket]::new()
-		$pktval.Header = [DnsHeader]::Parse($r)
+		$pkt = [DnsPacket]::new()
+		$pkt.Header = [DnsHeader]::Parse($r)
 
-		for ($i = 0; $i -lt $pktval.Header.QdCount; $i++) 
-		{$null = $pktval.Questions.Add([DnsQuestion]::Parse($r))}
+		for ($i = 0; $i -lt $pkt.Header.QdCount; $i++) 
+		{$null = $pkt.Questions.Add([DnsQuestion]::Parse($r))}
 
-		for ($i = 0; $i -lt $pktval.Header.AnCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.AnCount; $i++) 
 		{
 			if ($r.Position -ge $r.Buffer.Length) 
 			{throw 'DNS header ANCOUNT exceeds packet length'}
-			$null = $pktval.Answers.Add([DnsResourceRecord]::Parse($r))
+			$null = $pkt.Answers.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		for ($i = 0; $i -lt $pktval.Header.NsCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.NsCount; $i++) 
 		{
 			if ($r.Position -ge $r.Buffer.Length) 
 			{throw 'DNS header NSCOUNT exceeds packet length'}
-			$null = $pktval.Authority.Add([DnsResourceRecord]::Parse($r))
+			$null = $pkt.Authority.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		for ($i = 0; $i -lt $pktval.Header.ArCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.ArCount; $i++)
 		{
 			$saved = $r.Position
-			$r.ReadName()
-			$type = $r.ReadUInt16BE()
+
+			# OPT records always have name = root (single 0x00 byte)
+			# Check the first byte to determine if this might be an OPT record
+			$firstByte = $r.ReadUInt8()
 			$r.Position = $saved
 
-			if ($type -eq 41) 
+			# If first byte is 0x00, peek at the type to confirm it's OPT
+			if ($firstByte -eq 0)
 			{
-				if ($pktval.Opt) 
-				{throw 'Multiple OPT records not allowed'}
-				$pktval.Opt = [DnsOptRecord]::Parse($r)
+				$r.Position = $saved + 1  # Skip the 0x00 name
+				$type = $r.ReadUInt16BE()
+				$r.Position = $saved
+
+				if ($type -eq 41)
+				{
+					if ($pkt.Opt)
+					{throw 'Multiple OPT records not allowed'}
+					$pkt.Opt = [DnsOptRecord]::Parse($r)
+					continue
+				}
 			}
-			else 
-			{$null = $pktval.Additional.Add([DnsResourceRecord]::Parse($r))}
+
+			# Not an OPT record, parse as regular resource record
+			$null = $pkt.Additional.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		return $pktval
+		return $pkt
 	}
 
-	[byte[]] ToArray() 
+	[byte[]] ToArray()
 	{
 		$w = [DnsBinaryWriter]::new()
 
-		$optCount = if ($this.Opt) 
-		{1}
-		else 
-		{0}
+		$optCount = if ($this.Opt) {1} else {0}
 		$this.Header.ArCount = $this.Additional.Count + $optCount
 
 		$this.Header.Write($w)
 
-		foreach ($q in $this.Questions)  
+		foreach ($q in $this.Questions)
 		{$q.Write($w)}
-		foreach ($rr in $this.Answers)   
+		foreach ($rr in $this.Answers)
 		{$rr.Write($w)}
-		foreach ($rr in $this.Authority) 
+		foreach ($rr in $this.Authority)
 		{$rr.Write($w)}
 		foreach ($rr in $this.Additional)
 		{$rr.Write($w)}
 
-		if ($this.Opt) 
+		if ($this.Opt)
 		{$this.Opt.Write($w)}
 
 		return $w.ToArray()

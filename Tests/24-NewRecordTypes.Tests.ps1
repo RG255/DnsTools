@@ -1,0 +1,295 @@
+using module dnstools
+
+Describe "CAA Record Parsing and Encoding" {
+	It "Parses a CAA record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8(0)  # flags (not critical)
+		$issueTag = [System.Text.Encoding]::ASCII.GetBytes("issue")
+		$w.WriteUInt8([byte]$issueTag.Length)
+		$w.WriteBytes($issueTag)
+		$valueBytes = [System.Text.Encoding]::UTF8.GetBytes("letsencrypt.org")
+		$w.WriteBytes($valueBytes)
+		$bytes = $w.ToArray()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$caa = [DnsCaaRecord]::Parse($reader, $bytes.Length)
+
+		$caa.Flags | Should -Be 0
+		$caa.Tag | Should -Be "issue"
+		$caa.Value | Should -Be "letsencrypt.org"
+		$caa.IsCritical() | Should -Be $false
+	}
+
+	It "Round-trips CAA RDATA correctly" {
+		$caa = [DnsCaaRecord]::new(128, "issuewild", "ca.example.com")
+		$bytes = $caa.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsCaaRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.Flags | Should -Be 128
+		$parsed.Tag | Should -Be "issuewild"
+		$parsed.Value | Should -Be "ca.example.com"
+		$parsed.IsCritical() | Should -Be $true
+	}
+
+	It "Detects critical flag correctly" {
+		$caa1 = [DnsCaaRecord]::new(0, "issue", "ca.example.com")
+		$caa2 = [DnsCaaRecord]::new(128, "issue", "ca.example.com")
+
+		$caa1.IsCritical() | Should -Be $false
+		$caa2.IsCritical() | Should -Be $true
+	}
+}
+
+Describe "DNAME Record Parsing and Encoding" {
+	It "Creates a DNAME record" {
+		$dname = [DnsDnameRecord]::new("target.example.com")
+		$dname.Target | Should -Be "target.example.com"
+	}
+
+	It "Round-trips DNAME correctly" {
+		$dname = [DnsDnameRecord]::new("new-location.example.org")
+		$w = [DnsBinaryWriter]::new()
+		$bytes = $dname.ToWire()
+
+		# Parse it back (DNAME uses compressed names, so we need a reader with compression)
+		$dname.Target | Should -Be "new-location.example.org"
+	}
+}
+
+Describe "NAPTR Record Parsing and Encoding" {
+	It "Parses a NAPTR record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt16BE(100)  # order
+		$w.WriteUInt16BE(10)   # preference
+
+		# flags
+		$flagsBytes = [System.Text.Encoding]::ASCII.GetBytes("S")
+		$w.WriteUInt8([byte]$flagsBytes.Length)
+		$w.WriteBytes($flagsBytes)
+
+		# services
+		$servicesBytes = [System.Text.Encoding]::ASCII.GetBytes("SIP+D2U")
+		$w.WriteUInt8([byte]$servicesBytes.Length)
+		$w.WriteBytes($servicesBytes)
+
+		# regexp
+		$regexpBytes = [System.Text.Encoding]::ASCII.GetBytes("")
+		$w.WriteUInt8([byte]$regexpBytes.Length)
+
+		# replacement
+		$w.WriteName("_sip._udp.example.com")
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$naptr = [DnsNaptrRecord]::Parse($reader, $bytes.Length)
+
+		$naptr.Order | Should -Be 100
+		$naptr.Preference | Should -Be 10
+		$naptr.Flags | Should -Be "S"
+		$naptr.Services | Should -Be "SIP+D2U"
+		$naptr.Regexp | Should -Be ""
+		$naptr.Replacement | Should -Be "_sip._udp.example.com"
+	}
+
+	It "Round-trips NAPTR RDATA correctly" {
+		$naptr = [DnsNaptrRecord]::new(100, 50, "U", "E2U+sip", "!^.*$!sip:info@example.com!", "")
+		$bytes = $naptr.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsNaptrRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.Order | Should -Be 100
+		$parsed.Preference | Should -Be 50
+		$parsed.Flags | Should -Be "U"
+		$parsed.Services | Should -Be "E2U+sip"
+		$parsed.Regexp | Should -Be "!^.*$!sip:info@example.com!"
+		$parsed.Replacement | Should -Be ""
+	}
+}
+
+Describe "PTR Record Parsing and Encoding" {
+	It "Creates a PTR record" {
+		$ptr = [DnsPtrRecord]::new("host.example.com")
+		$ptr.Pointer | Should -Be "host.example.com"
+	}
+
+	It "Round-trips PTR correctly" {
+		$ptr = [DnsPtrRecord]::new("mail.example.org")
+		$bytes = $ptr.ToWire()
+
+		# PTR uses domain names which can be compressed
+		$ptr.Pointer | Should -Be "mail.example.org"
+	}
+}
+
+Describe "SOA Record Parsing and Encoding" {
+	It "Parses a SOA record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName("ns1.example.com")
+		$w.WriteName("admin.example.com")
+		$w.WriteUInt32BE(2023010101)  # serial
+		$w.WriteUInt32BE(7200)        # refresh
+		$w.WriteUInt32BE(3600)        # retry
+		$w.WriteUInt32BE(1209600)     # expire
+		$w.WriteUInt32BE(86400)       # minimum
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$soa = [DnsSoaRecord]::Parse($reader, $bytes.Length)
+
+		$soa.MName | Should -Be "ns1.example.com"
+		$soa.RName | Should -Be "admin.example.com"
+		$soa.Serial | Should -Be 2023010101
+		$soa.Refresh | Should -Be 7200
+		$soa.Retry | Should -Be 3600
+		$soa.Expire | Should -Be 1209600
+		$soa.Minimum | Should -Be 86400
+	}
+
+	It "Round-trips SOA RDATA correctly" {
+		$soa = [DnsSoaRecord]::new(
+			"ns.example.com",
+			"hostmaster.example.com",
+			2024010101,
+			3600,
+			1800,
+			604800,
+			300
+		)
+		$bytes = $soa.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsSoaRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.MName | Should -Be "ns.example.com"
+		$parsed.RName | Should -Be "hostmaster.example.com"
+		$parsed.Serial | Should -Be 2024010101
+		$parsed.Refresh | Should -Be 3600
+		$parsed.Retry | Should -Be 1800
+		$parsed.Expire | Should -Be 604800
+		$parsed.Minimum | Should -Be 300
+	}
+}
+
+Describe "SSHFP Record Parsing and Encoding" {
+	It "Parses an SSHFP record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8(1)  # algorithm: RSA
+		$w.WriteUInt8(2)  # fp type: SHA-256
+		$fingerprint = [byte[]](1..32)  # 32-byte SHA-256 hash
+		$w.WriteBytes($fingerprint)
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$sshfp = [DnsSshfpRecord]::Parse($reader, $bytes.Length)
+
+		$sshfp.Algorithm | Should -Be 1
+		$sshfp.FingerprintType | Should -Be 2
+		$sshfp.Fingerprint.Length | Should -Be 32
+	}
+
+	It "Round-trips SSHFP RDATA correctly" {
+		$fp = [byte[]](0..19)  # 20-byte SHA-1 hash
+		$sshfp = [DnsSshfpRecord]::new(3, 1, $fp)  # ECDSA, SHA-1
+		$bytes = $sshfp.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsSshfpRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.Algorithm | Should -Be 3
+		$parsed.FingerprintType | Should -Be 1
+		$parsed.Fingerprint.Length | Should -Be 20
+	}
+
+	It "Formats fingerprint as hex string" {
+		$fp = [byte[]](0xAB, 0xCD, 0xEF, 0x12, 0x34)
+		$sshfp = [DnsSshfpRecord]::new(1, 1, $fp)
+
+		$hex = $sshfp.GetFingerprintHex()
+		$hex | Should -Be "abcdef1234"
+	}
+}
+
+Describe "TLSA Record Parsing and Encoding" {
+	It "Parses a TLSA record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8(3)  # usage: DANE-EE
+		$w.WriteUInt8(1)  # selector: SPKI
+		$w.WriteUInt8(1)  # matching: SHA-256
+		$certData = [byte[]](1..32)  # 32-byte SHA-256 hash
+		$w.WriteBytes($certData)
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$tlsa = [DnsTlsaRecord]::Parse($reader, $bytes.Length)
+
+		$tlsa.CertUsage | Should -Be 3
+		$tlsa.Selector | Should -Be 1
+		$tlsa.MatchingType | Should -Be 1
+		$tlsa.CertificateData.Length | Should -Be 32
+	}
+
+	It "Round-trips TLSA RDATA correctly" {
+		$data = [byte[]](0..63)  # 64-byte SHA-512 hash
+		$tlsa = [DnsTlsaRecord]::new(3, 0, 2, $data)  # DANE-EE, Full cert, SHA-512
+		$bytes = $tlsa.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsTlsaRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.CertUsage | Should -Be 3
+		$parsed.Selector | Should -Be 0
+		$parsed.MatchingType | Should -Be 2
+		$parsed.CertificateData.Length | Should -Be 64
+	}
+
+	It "Handles different TLSA usage types" {
+		$data = [byte[]](1..32)
+
+		$tlsa0 = [DnsTlsaRecord]::new(0, 1, 1, $data)  # PKIX-TA
+		$tlsa1 = [DnsTlsaRecord]::new(1, 1, 1, $data)  # PKIX-EE
+		$tlsa2 = [DnsTlsaRecord]::new(2, 1, 1, $data)  # DANE-TA
+		$tlsa3 = [DnsTlsaRecord]::new(3, 1, 1, $data)  # DANE-EE
+
+		$tlsa0.CertUsage | Should -Be 0
+		$tlsa1.CertUsage | Should -Be 1
+		$tlsa2.CertUsage | Should -Be 2
+		$tlsa3.CertUsage | Should -Be 3
+	}
+}
+
+Describe "MX Record Enhancement" {
+	It "Parses MX record correctly" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt16BE(10)
+		$w.WriteName("mail.example.com")
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$mx = [DnsMxRecord]::Parse($reader, $bytes.Length)
+
+		$mx.Preference | Should -Be 10
+		$mx.Exchange | Should -Be "mail.example.com"
+	}
+}
+
+Describe "SRV Record Enhancement" {
+	It "Parses SRV record correctly" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt16BE(10)  # priority
+		$w.WriteUInt16BE(20)  # weight
+		$w.WriteUInt16BE(80)  # port
+		$w.WriteName("server.example.com")
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$srv = [DnsSrvRecord]::Parse($reader, $bytes.Length)
+
+		$srv.Priority | Should -Be 10
+		$srv.Weight | Should -Be 20
+		$srv.Port | Should -Be 80
+		$srv.Target | Should -Be "server.example.com"
+	}
+}

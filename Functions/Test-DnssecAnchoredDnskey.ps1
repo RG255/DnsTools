@@ -1,11 +1,30 @@
-﻿function Test-DnssecAnchoredDnskey 
+function Test-DnssecAnchoredDnskey
 {
+	<#
+	.SYNOPSIS
+		Verifies a DNSKEY against a configured trust anchor.
+
+	.DESCRIPTION
+		Checks if a DNSKEY matches a configured trust anchor for a zone, establishing the root of trust.
+
+	.PARAMETER Zone
+		The zone name to check.
+
+	.PARAMETER Dnskey
+		The DNSKEY record to verify.
+	#>
 	param(
 		[string]$Zone,
 		[DnsDnskeyRecord]$Dnskey
 	)
 
-	if (-not $script:TrustAnchors.ContainsKey($Zone)) 
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
+	$trustAnchorsVar = Get-Variable -Name TrustAnchors -Scope Script -ErrorAction SilentlyContinue
+	if (-not $trustAnchorsVar -or -not $trustAnchorsVar.Value)
+	{return $false}
+
+	if (-not $script:TrustAnchors.ContainsKey($Zone))
 	{return $false}
 
 	$anchor = $script:TrustAnchors[$Zone]

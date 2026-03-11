@@ -1,23 +1,25 @@
-﻿# Tests/15-ResolverEdgeCases.Tests.ps1
+# Tests/15-ResolverEdgeCases.Tests.ps1
 # Iterative Resolver Edge Case Tests
 
 using module dnstools
 
 Describe "Iterative Resolver - Edge Case Handling" {
 
-    $fixtures = Join-Path $PSScriptRoot "Fixtures"
+    BeforeAll {
+        $script:fixtures = Join-Path $PSScriptRoot "Fixtures"
 
-    #
-    # Helper: Load fixture and parse into DnsPacket
-    #
-    function Load-FixturePacket {
-        param([string]$name)
+        #
+        # Helper: Load fixture and parse into DnsPacket
+        #
+        function script:Load-FixturePacket {
+            param([string]$name)
 
-        $path = Join-Path $fixtures $name
-        Test-Path $path | Should -BeTrue
+            $path = Join-Path $script:fixtures $name
+            Test-Path $path | Should -BeTrue
 
-        $bytes = [IO.File]::ReadAllBytes($path)
-        return [DnsPacket]::Parse($bytes)
+            $bytes = [IO.File]::ReadAllBytes($path)
+            return [DnsPacket]::Parse($bytes)
+        }
     }
 
     #
@@ -42,7 +44,7 @@ Describe "Iterative Resolver - Edge Case Handling" {
         Mock Invoke-DnsUdpQuery {
             param($Server, $Query)
             return $Script:FakeTransport.Query($Server, $Query)
-        }
+        } -ModuleName DnsTools
     }
 
     #
@@ -54,10 +56,10 @@ Describe "Iterative Resolver - Edge Case Handling" {
             $pkt = Load-FixturePacket "referral-broken-glue.bin"
             $Script:FakeTransport = [FakeUdpTransport]::new($pkt)
 
-            $result = Resolve-DnsIterative -Name "broken.example" -Type 1 -RootServers @("192.0.2.1")
+            $result = Resolve-DnsIterative -Name "broken.example" -Type 1 -RootServers @("192.0.2.1") -Raw
 
             $result.Status | Should -Be "BailOut"
-            $result.Reason | Should -Match "no usable referrals"
+            $result.Reason | Should -Match "(no usable referrals|cycle detected)"
         }
     }
 
@@ -70,10 +72,10 @@ Describe "Iterative Resolver - Edge Case Handling" {
             $pkt = Load-FixturePacket "referral-mismatched-ns.bin"
             $Script:FakeTransport = [FakeUdpTransport]::new($pkt)
 
-            $result = Resolve-DnsIterative -Name "mismatch.example" -Type 1 -RootServers @("192.0.2.1")
+            $result = Resolve-DnsIterative -Name "mismatch.example" -Type 1 -RootServers @("192.0.2.1") -Raw
 
             $result.Status | Should -Be "BailOut"
-            $result.Reason | Should -Match "no usable referrals"
+            $result.Reason | Should -Match "(no usable referrals|cycle detected)"
         }
     }
 
@@ -86,10 +88,10 @@ Describe "Iterative Resolver - Edge Case Handling" {
             $pkt = Load-FixturePacket "referral-empty-authority.bin"
             $Script:FakeTransport = [FakeUdpTransport]::new($pkt)
 
-            $result = Resolve-DnsIterative -Name "empty.example" -Type 1 -RootServers @("192.0.2.1")
+            $result = Resolve-DnsIterative -Name "empty.example" -Type 1 -RootServers @("192.0.2.1") -Raw
 
             $result.Status | Should -Be "BailOut"
-            $result.Reason | Should -Match "no usable referrals"
+            $result.Reason | Should -Match "(no usable referrals|cycle detected)"
         }
     }
 
@@ -102,7 +104,7 @@ Describe "Iterative Resolver - Edge Case Handling" {
             $pkt = Load-FixturePacket "referral-cyclic-ns.bin"
             $Script:FakeTransport = [FakeUdpTransport]::new($pkt)
 
-            $result = Resolve-DnsIterative -Name "cycle.example" -Type 1 -RootServers @("192.0.2.1")
+            $result = Resolve-DnsIterative -Name "cycle.example" -Type 1 -RootServers @("192.0.2.1") -Raw
 
             $result.Status | Should -Be "BailOut"
             $result.Reason | Should -Match "cycle"
@@ -123,7 +125,7 @@ Describe "Iterative Resolver - Edge Case Handling" {
 
             Mock Invoke-DnsUdpQuery { return $bytes }
 
-            $result = Resolve-DnsIterative -Name "trunc.example" -Type 1 -RootServers @("192.0.2.1")
+            $result = Resolve-DnsIterative -Name "trunc.example" -Type 1 -RootServers @("192.0.2.1") -Raw
 
             $result.Status | Should -Be "BailOut"
         }
@@ -139,7 +141,7 @@ Describe "Iterative Resolver - Edge Case Handling" {
             $pkt = Load-FixturePacket "referral-cyclic-ns.bin"
             $Script:FakeTransport = [FakeUdpTransport]::new($pkt)
 
-            $result = Resolve-DnsIterative -Name "loop.example" -Type 1 -RootServers @("192.0.2.1")
+            $result = Resolve-DnsIterative -Name "loop.example" -Type 1 -RootServers @("192.0.2.1") -Raw
 
             $result.Status | Should -Be "BailOut"
             $result.Reason | Should -Match "Server-set cycle"

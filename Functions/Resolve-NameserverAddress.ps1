@@ -1,5 +1,24 @@
-﻿function Resolve-NameserverAddress 
+function Resolve-NameserverAddress
 {
+	<#
+	.SYNOPSIS
+		Resolves the IP addresses of a nameserver.
+
+	.DESCRIPTION
+		Resolves a nameserver hostname to IP addresses using bootstrap servers, handling glue records and recursive resolution.
+
+	.PARAMETER nsName
+		The nameserver hostname to resolve.
+
+	.PARAMETER BootstrapServers
+		Array of bootstrap server IP addresses to use for initial queries.
+
+	.PARAMETER UseGlueOnly
+		Return glue addresses immediately without authoritative resolution (for testing).
+
+	.PARAMETER Trace
+		Enable verbose trace output for debugging nameserver resolution.
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory)]
@@ -8,11 +27,12 @@
 		[Parameter(Mandatory)]
 		[string[]]$BootstrapServers,
 
-		[switch]$ReturnAuthoritative,
+		[switch]$UseGlueOnly,
 		[switch]$Trace
 	)
-	Write-host "### USING RESOLVER VERSION: $(Get-Date)" -ForegroundColor Yellow
-	
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
 	$target = $nsName.TrimEnd('.').ToLower()
 	$currentServers = $BootstrapServers | Sort-Object -Unique
 
@@ -42,14 +62,9 @@
 
 					$query = New-DnsQueryPacket -name $target -type $qType -DoBit
 					$bytes = Invoke-DnsUdpQuery -server $server -query $query
-					$resp  = Parse-DnsPacket -packet $bytes
+					$resp  = ConvertFrom-DnsPacket -packet $bytes
 
 					Write-Trace -Message "Received response: Q=$($resp.Questions[0].Name) AUTH=$($resp.Authority.Count)"
-					Write-Host "### ADDITIONAL COUNT: $($resp.Additional.Count)" -ForegroundColor Cyan
-					foreach ($rr in $resp.Additional) {
-						Write-Host "### ADDITIONAL TYPE: $($rr.Type) NAME: $($rr.Name) RDATA: $($rr.RData)" -ForegroundColor DarkCyan
-					}
-					
 
 					foreach ($rr in $resp.Answers)
 					{
@@ -66,7 +81,7 @@
 				# -------------------------
 				# Glue handling
 				# -------------------------
-				$glueAddrs = $resp.Additional |
+				$glueAddrs = @($resp.Additional |
 				Where-Object { $_.Type -in 1,28 } |
 				ForEach-Object {
 					if ($_.RDataObject -and $_.RDataObject.Address) {
@@ -74,13 +89,11 @@
 					}
 				} |
 				Where-Object { $_ } |
-				Sort-Object -Unique
-				
-				Write-Host "### GLUE COUNT: $($glueAddrs.Count)" -ForegroundColor Cyan
+				Sort-Object -Unique)
 				
 				if ($glueAddrs.Count -gt 0) {
 
-					if (-not $ReturnAuthoritative) {
+					if ($UseGlueOnly) {
 						Write-Trace -Message "Returning glue addresses: $($glueAddrs -join ', ')"
 						return $glueAddrs
 					}
@@ -117,7 +130,7 @@
 
 					Write-Trace -Message "Recursing to resolve NS name $nsKey"
 
-					$nsAddrs = Resolve-NameserverAddress -nsName $ns -BootstrapServers $BootstrapServers -ReturnAuthoritative:$ReturnAuthoritative -Trace:$Trace
+					$nsAddrs = Resolve-NameserverAddress -nsName $ns -BootstrapServers $BootstrapServers -UseGlueOnly:$UseGlueOnly -Trace:$Trace
 					if ($nsAddrs) {
 						foreach ($a in $nsAddrs) {
 							if (-not [string]::IsNullOrWhiteSpace($a)) {

@@ -12,14 +12,15 @@ class DnsDsRecord {
 		$this.Digest     = $digest
 	}
 
-	static [DnsDsRecord] Parse([byte[]]$rdata) 
+	static [DnsDsRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r       = [DnsBinaryReader]::new($rdata)
-		$tagval  = $r.ReadUInt16BE()
-		$algVal  = $r.ReadUInt8()
-		$dtypeval = $r.ReadUInt8()
-		$digval  = $r.ReadBytes($rdata.Length - $r.Position)
-		return [DnsDsRecord]::new($tagval,$algVal,$dtypeval,$digval)
+		$startPos = $r.Position
+		$tag  = $r.ReadUInt16BE()
+		$alg  = $r.ReadUInt8()
+		$dtype = $r.ReadUInt8()
+		$remaining = $len - ($r.Position - $startPos)
+		$dig  = $r.ReadBytes($remaining)
+		return [DnsDsRecord]::new($tag,$alg,$dtype,$dig)
 	}
 
 	[byte[]]ToWire() 

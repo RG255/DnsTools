@@ -1,11 +1,41 @@
-﻿function Resolve-DnssecChain 
+function Resolve-DnssecChain
 {
+	<#
+	.SYNOPSIS
+		Validates the complete DNSSEC chain of trust for a domain name.
+
+	.DESCRIPTION
+		Walks the DNSSEC chain from the root zone through all intermediate zones to validate the full chain of trust.
+
+	.PARAMETER name
+		The fully qualified domain name to validate.
+
+	.PARAMETER type
+		The DNS record type to query (default: 1 = A record).
+
+	.PARAMETER RootServers
+		Array of root server IP addresses to use for resolution (defaults to module-configured root servers).
+
+	.PARAMETER Trace
+		Enable verbose trace output for debugging DNSSEC validation.
+	#>
+	[CmdletBinding()]
 	param(
+		[Parameter(Mandatory)]
 		[string]$name,
-		[int]$type = 1,
-		[string[]]$RootServers = @(...),
+
+		$type = 'A',
+
+		[Parameter(DontShow)]
+		[string[]]$RootServers = $script:RootServerAddresses,
+
 		[switch]$Trace
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
+	# Convert type name to code if needed
+	$TypeCode = ConvertTo-DnsTypeCode -Type $type
 
 	# 1. Load root trust anchor (hard-coded DNSKEY RRset for ".")
 	$rootKeys = Get-RootTrustAnchor
@@ -37,7 +67,7 @@
 	}
 
 	# 3. Finally, validate the RRset at $Name using the last zone's keys
-	$leaf = Resolve-Dnssec -name $name -type $type -RootServers $RootServers -Trace:$Trace
+	$leaf = Resolve-Dnssec -name $name -type $TypeCode -RootServers $RootServers -Trace:$Trace
 
 	if (-not $leaf.Valid) 
 	{

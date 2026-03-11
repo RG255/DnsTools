@@ -1,10 +1,28 @@
-﻿function Get-DnssecKeyDigest 
+function Get-DnssecKeyDigest
 {
+	<#
+	.SYNOPSIS
+		Computes the DS digest for a DNSKEY record.
+
+	.DESCRIPTION
+		Calculates the DS (Delegation Signer) digest for a DNSKEY using the specified hash algorithm.
+
+	.PARAMETER OwnerName
+		The owner name of the DNSKEY record.
+
+	.PARAMETER Dnskey
+		The DNSKEY record object.
+
+	.PARAMETER DigestType
+		The digest algorithm type (1=SHA-1, 2=SHA-256, 4=SHA-384).
+	#>
 	param(
 		[string]$OwnerName,
 		[DnsDnskeyRecord]$Dnskey,
 		[int]$DigestType
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	# Canonical owner name
 	$nameWire = [byte[]](Get-DnssecCanonicalNameWire -name $OwnerName)

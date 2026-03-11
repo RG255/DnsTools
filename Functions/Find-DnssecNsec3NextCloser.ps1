@@ -1,5 +1,24 @@
-﻿function Find-DnssecNsec3NextCloser 
+function Find-DnssecNsec3NextCloser
 {
+	<#
+	.SYNOPSIS
+		Finds the next closer name in NSEC3 denial of existence proofs.
+
+	.DESCRIPTION
+		Identifies the next closer name between the closest encloser and the query name for NSEC3 authenticated denial.
+
+	.PARAMETER QueryName
+		The domain name that was queried.
+
+	.PARAMETER ClosestEncloserName
+		The closest existing ancestor name.
+
+	.PARAMETER Nsec3Records
+		The NSEC3 records to search.
+
+	.PARAMETER HashAlgorithm
+		The NSEC3 hash algorithm.
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory)]
@@ -20,6 +39,8 @@
 		[Parameter(Mandatory)]
 		[byte[]]$salt
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	# Filter to real NSEC3 records
 	$records = $Nsec3Records | Where-Object -FilterScript {$_ -is [DnsNsec3Record]}

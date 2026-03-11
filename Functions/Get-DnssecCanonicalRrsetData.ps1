@@ -1,8 +1,20 @@
-﻿function Get-DnssecCanonicalRrsetData 
+function Get-DnssecCanonicalRrsetData
 {
+	<#
+	.SYNOPSIS
+		Sorts an RRset into DNSSEC canonical order.
+
+	.DESCRIPTION
+		Sorts resource records in an RRset by their RDATA in canonical order for DNSSEC signature verification.
+
+	.PARAMETER Rrset
+		The array of DNS resource records to sort.
+	#>
 	param(
 		[DnsResourceRecord[]]$Rrset
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	if (-not $Rrset -or $Rrset.Count -eq 0) 
 	{throw 'RRset is empty.'}

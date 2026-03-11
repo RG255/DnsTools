@@ -30,18 +30,20 @@ class DnsOptRecord {
 		if ($type -ne 41) 
 		{throw 'Invalid OPT TYPE'}
 
-		$udpSizeval  = $r.ReadUInt16BE()
-		$extRcodeval = $r.ReadUInt8()
-		$versionval  = $r.ReadUInt8()
-		$flagsval    = $r.ReadUInt16BE()
-		$rdlenval    = $r.ReadUInt16BE()
-		$optsval     = if ($rdlenval -gt 0) 
-		{$r.ReadBytes($rdlenval)}
-		else 
-		{@()}
+		$udp  = $r.ReadUInt16BE()
+		$rcode = $r.ReadUInt8()
+		$ver  = $r.ReadUInt8()
+		$flgs    = $r.ReadUInt16BE()
+		$rdlen = $r.ReadUInt16BE()
+		[byte[]]$opts = $null
+		if ($rdlen -gt 0) {
+			$opts = $r.ReadBytes($rdlen)
+		} else {
+			$opts = [byte[]]@()
+		}
 
 		return [DnsOptRecord]::new(
-			$udpSizeval, $extRcodeval, $versionval, $flagsval, $optsval
+			$udp, $rcode, $ver, $flgs, $opts
 		)
 	}
 

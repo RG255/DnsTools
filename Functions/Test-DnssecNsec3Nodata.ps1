@@ -1,5 +1,24 @@
-﻿function Test-DnssecNsec3Nodata 
+function Test-DnssecNsec3Nodata
 {
+	<#
+	.SYNOPSIS
+		Proves DNSSEC authenticated denial of existence for NSEC3 NODATA.
+
+	.DESCRIPTION
+		Validates that NSEC3 records correctly prove that a name exists but the requested type does not.
+
+	.PARAMETER QueryName
+		The domain name that was queried.
+
+	.PARAMETER QueryType
+		The record type that was queried.
+
+	.PARAMETER Nsec3Records
+		The NSEC3 records to validate against.
+
+	.PARAMETER HashAlgorithm
+		The NSEC3 hash algorithm.
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory)]
@@ -20,6 +39,8 @@
 		[Parameter(Mandatory)]
 		[byte[]]$salt
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	$queryCanon = $QueryName.ToLower().TrimEnd('.')
 

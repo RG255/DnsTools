@@ -1,11 +1,9 @@
-﻿# Tests/12-DnssecCanonicalization.Tests.ps1
+# Tests/12-DnssecCanonicalization.Tests.ps1
 # DNSSEC Canonicalization Tests (RFC 4034)
 
 using module dnstools
 
 Describe "DNSSEC Canonicalization Functions" {
-
-    $fixtures = Join-Path $PSScriptRoot "Fixtures"
 
     Context "Canonical Name Wire" {
 
@@ -19,12 +17,13 @@ Describe "DNSSEC Canonicalization Functions" {
             $bytes[4]  | Should -Be 7
             $bytes[5..11] | ForEach-Object { [char]$_ } | Should -Be @('e','x','a','m','p','l','e')
 
-            $bytes[-2] | Should -Be 3
-            $bytes[-1] | Should -Be 0
+            $bytes[12] | Should -Be 3
+            $bytes[13..15] | ForEach-Object { [char]$_ } | Should -Be @('c','o','m')
+            $bytes[16] | Should -Be 0
         }
 
         It "Matches canonical-name-wire.bin fixture" {
-            $path = Join-Path $fixtures "canonical-name-wire.bin"
+            $path = Join-Path $PSScriptRoot/Fixtures "canonical-name-wire.bin"
             $fixture = [IO.File]::ReadAllBytes($path)
 
             $bytes = Get-DnssecCanonicalNameWire -Name "www.Example.COM"
@@ -66,7 +65,7 @@ Describe "DNSSEC Canonicalization Functions" {
         }
 
         It "Matches canonical-rrset.bin fixture" {
-            $path = Join-Path $fixtures "canonical-rrset.bin"
+            $path = Join-Path $PSScriptRoot/Fixtures "canonical-rrset.bin"
             $fixture = [IO.File]::ReadAllBytes($path)
 
             $rr1 = [DnsResourceRecord]::new("a.example", 1, 1, 300, ([byte[]](1,2,3,4)), $null)
@@ -105,7 +104,7 @@ Describe "DNSSEC Canonicalization Functions" {
         }
 
         It "Matches signed-data.bin fixture" {
-            $path = Join-Path $fixtures "signed-data.bin"
+            $path = Join-Path $PSScriptRoot/Fixtures "signed-data.bin"
             $fixture = [IO.File]::ReadAllBytes($path)
 
             $rr1 = [DnsResourceRecord]::new("a.example", 1, 1, 300, ([byte[]](1,2,3,4)), $null)

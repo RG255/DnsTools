@@ -1,6 +1,17 @@
-﻿function Get-DnssecTrustAnchors 
+function Get-DnssecTrustAnchors
 {
-	if (-not $script:TrustAnchors) 
+	<#
+	.SYNOPSIS
+		Retrieves all configured DNSSEC trust anchors.
+
+	.DESCRIPTION
+		Returns the list of currently configured DNSSEC trust anchors in the module.
+	#>
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
+	$trustAnchorsVar = Get-Variable -Name TrustAnchors -Scope Script -ErrorAction SilentlyContinue
+	if (-not $trustAnchorsVar -or -not $trustAnchorsVar.Value)
 	{return @()}
 
 	return $script:TrustAnchors.GetEnumerator() | ForEach-Object -Process {

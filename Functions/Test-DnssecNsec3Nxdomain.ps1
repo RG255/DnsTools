@@ -1,5 +1,24 @@
-﻿function Test-DnssecNsec3Nxdomain 
+function Test-DnssecNsec3Nxdomain
 {
+	<#
+	.SYNOPSIS
+		Proves DNSSEC authenticated denial of existence for NSEC3 NXDOMAIN.
+
+	.DESCRIPTION
+		Validates that NSEC3 records correctly prove that a name does not exist in the zone.
+
+	.PARAMETER QueryName
+		The domain name that was queried.
+
+	.PARAMETER Nsec3Records
+		The NSEC3 records to validate against.
+
+	.PARAMETER HashAlgorithm
+		The NSEC3 hash algorithm.
+
+	.PARAMETER Iterations
+		The number of hash iterations used.
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory)]
@@ -17,6 +36,8 @@
 		[Parameter(Mandatory)]
 		[byte[]]$salt
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	# 1. Closest Encloser
 	$ce = Find-DnssecNsec3ClosestEncloser `

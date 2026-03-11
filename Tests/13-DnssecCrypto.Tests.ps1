@@ -1,4 +1,4 @@
-﻿# Tests/13-DnssecCrypto.Tests.ps1
+# Tests/13-DnssecCrypto.Tests.ps1
 # DNSSEC Cryptographic Operations Tests
 
 using module dnstools
@@ -10,18 +10,24 @@ Describe "DNSSEC Cryptographic Functions" {
     #
     BeforeAll {
         # RSA 2048-bit test key
-        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
-        $rsaPub = $rsa.ExportSubjectPublicKeyInfo()
+        $script:TestRsa = [System.Security.Cryptography.RSA]::Create(2048)
+        $rsaParams = $script:TestRsa.ExportParameters($false)
+
+        # Convert to DNSKEY wire format: [exp_len][exponent][modulus]
+        $expLen = $rsaParams.Exponent.Length
+        if ($expLen -le 255) {
+            $script:TestRsaPub = [byte[]]@($expLen) + $rsaParams.Exponent + $rsaParams.Modulus
+        } else {
+            $script:TestRsaPub = [byte[]]@(0, ($expLen -shr 8), ($expLen -band 0xFF)) + $rsaParams.Exponent + $rsaParams.Modulus
+        }
 
         # ECDSA P-256 test key
-        $ecdsa = [System.Security.Cryptography.ECDsa]::Create([System.Security.Cryptography.ECCurve]::NamedCurves.nistP256)
-        $ecdsaPub = $ecdsa.ExportSubjectPublicKeyInfo()
+        $curve = [System.Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP256')
+        $script:TestEcdsa = [System.Security.Cryptography.ECDsa]::Create($curve)
+        $ecParams = $script:TestEcdsa.ExportParameters($false)
 
-        Set-Variable -Name TestRsa -Value $rsa -Scope Script
-        Set-Variable -Name TestRsaPub -Value $rsaPub -Scope Script
-
-        Set-Variable -Name TestEcdsa -Value $ecdsa -Scope Script
-        Set-Variable -Name TestEcdsaPub -Value $ecdsaPub -Scope Script
+        # Convert to DNSKEY wire format: [X (32 bytes)][Y (32 bytes)]
+        $script:TestEcdsaPub = $ecParams.Q.X + $ecParams.Q.Y
     }
 
     Context "KeyTag Computation" {
@@ -79,13 +85,7 @@ Describe "DNSSEC Cryptographic Functions" {
                 $sig
             )
 
-            # Fake RRset (not used for crypto here)
-            $rrset = @()
-
-            # Override Get-DnssecSignedData to return our synthetic data
-            Mock Get-DnssecSignedData { return $data }
-
-            $ok = Test-DnssecSignature -Rrsig $rrsig -Rrset $rrset -Dnskey $dnskey
+            $ok = Test-DnssecSignature -SignedData $data -Rrsig $rrsig -Dnskey $dnskey
             $ok | Should -BeTrue
         }
 
@@ -107,9 +107,7 @@ Describe "DNSSEC Cryptographic Functions" {
                 $sig
             )
 
-            Mock Get-DnssecSignedData { return $data }
-
-            $ok = Test-DnssecSignature -Rrsig $rrsig -Rrset @() -Dnskey $dnskey
+            $ok = Test-DnssecSignature -SignedData $data -Rrsig $rrsig -Dnskey $dnskey
             $ok | Should -BeTrue
         }
     }

@@ -1,5 +1,24 @@
-﻿function Test-DnssecChain 
+function Test-DnssecChain
 {
+	<#
+	.SYNOPSIS
+		Validates a complete DNSSEC chain for a zone.
+
+	.DESCRIPTION
+		Verifies the DNSSEC chain by checking DS-to-DNSKEY matching and RRSIG signatures.
+
+	.PARAMETER DnskeyRrset
+		The DNSKEY RRset for the zone.
+
+	.PARAMETER DsRrset
+		The DS RRset from the parent zone.
+
+	.PARAMETER RrsigRrset
+		The RRSIG RRset covering the DNSKEY.
+
+	.PARAMETER ZoneName
+		The name of the zone being validated.
+	#>
 	param(
 		[DnsResourceRecord[]]$DnskeyRrset,
 		[DnsResourceRecord[]]$DsRrset,
@@ -7,9 +26,11 @@
 		[string]$ZoneName
 	)
 
-	$dnskeys = $DnskeyRrset | ForEach-Object -Process {$_.RData}
-	$dsRecords = $DsRrset | ForEach-Object -Process {$_.RData}
-	$rrsigs = $RrsigRrset | ForEach-Object -Process {$_.RData}
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
+	$dnskeys = $DnskeyRrset | ForEach-Object -Process {$_.RDataObject}
+	$dsRecords = $DsRrset | ForEach-Object -Process {$_.RDataObject}
+	$rrsigs = $RrsigRrset | ForEach-Object -Process {$_.RDataObject}
 
 	$dsCheck = Test-DnssecDsForDnskey -DsRrset $DsRrset -DnskeyRrset $DnskeyRrset -ChildZoneName $ZoneName
 
@@ -36,7 +57,7 @@
 			}
 		}
 
-		$ok = Test-DnssecRrsig -Rrsig $sig -Rrset $DnskeyRrset -DnskeyRrset $key.RdataObject
+		$ok = Test-DnssecRrsig -Rrsig $sig -Rrset $DnskeyRrset -DnskeyRrset $DnskeyRrset
 		if (-not $ok) 
 		{
 			return [pscustomobject]@{

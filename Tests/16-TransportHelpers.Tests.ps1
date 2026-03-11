@@ -1,4 +1,4 @@
-﻿# Tests/16-TransportHelpers.Tests.ps1
+# Tests/16-TransportHelpers.Tests.ps1
 # Transport Helper Function Tests
 
 using module dnstools
@@ -73,7 +73,7 @@ Describe "Transport Helper Functions" {
                 }
             }
 
-            { & $script } | Should -Throw -ErrorMessage "*transport failed: boom*"
+            { & $script } | Should -Throw -ExpectedMessage "*transport failed: boom*"
         }
 
         It "Does not swallow exceptions" {

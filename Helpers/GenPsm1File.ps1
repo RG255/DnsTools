@@ -1,38 +1,78 @@
-﻿$ClassFiles     = @(
-		# Binary infrastructure
-		"$PSScriptRoot\Classes\BinaryInfrastructure\DnsBinaryWriter.ps1"
-		"$PSScriptRoot\Classes\BinaryInfrastructure\DnsBinaryReader.ps1"
+# GenPsm1File.ps1 - Generates DnsTools.psm1 from class files and tail script
+# Location: Helpers folder
+# NOTE: If this file or DnsTools-psm1-Tail.ps1 is edited, run this script and deploy changes
 
-		# Core DNS structures
-		"$PSScriptRoot\Classes\Core\DnsHeader.ps1"
-		"$PSScriptRoot\Classes\Core\DnsQuestion.ps1"
+$ModuleRoot = Split-Path -Path $PSScriptRoot -Parent
 
-		# Basic RR types
-		"$PSScriptRoot\Classes\Basic\DnsARecord.ps1"
-		"$PSScriptRoot\Classes\Basic\DnsAaaaRecord.ps1"
-		"$PSScriptRoot\Classes\Basic\DnsCnameRecord.ps1"
-		"$PSScriptRoot\Classes\Basic\DnsMxRecord.ps1"
-		"$PSScriptRoot\Classes\Basic\DnsTxtRecord.ps1"
-		"$PSScriptRoot\Classes\Basic\DnsSrvRecord.ps1"
-		"$PSScriptRoot\Classes\Basic\DnsNsRecord.ps1"
+$ClassFiles = @(
+	# Binary infrastructure
+	"$ModuleRoot\Classes\BinaryInfrastructure\DnsBinaryWriter.ps1"
+	"$ModuleRoot\Classes\BinaryInfrastructure\DnsBinaryReader.ps1"
 
-		# DNSSEC
-		"$PSScriptRoot\Classes\DnsSec\DnsDnskeyRecord.ps1"
-		"$PSScriptRoot\Classes\DnsSec\DnsDsRecord.ps1"
-		"$PSScriptRoot\Classes\DnsSec\DnsRrsigRecord.ps1"
-		"$PSScriptRoot\Classes\DnsSec\DnsNsecRecord.ps1"
-		"$PSScriptRoot\Classes\DnsSec\DnsNsec3Record.ps1"
+	# Core DNS structures
+	"$ModuleRoot\Classes\Core\DnsHeader.ps1"
+	"$ModuleRoot\Classes\Core\DnsQuestion.ps1"
 
-		# Resource & EDNS
-		"$PSScriptRoot\Classes\Resource\DnsResourceRecord.ps1"
-		"$PSScriptRoot\Classes\EDNS-OPT\DnsOptRecord.ps1"
+	# Basic RR types
+	"$ModuleRoot\Classes\Basic\DnsARecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsAaaaRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsCnameRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsMxRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsTxtRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsSrvRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsNsRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsPtrRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsSoaRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsCaaRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsDnameRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsNaptrRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsSshfpRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsTlsaRecord.ps1"
 
-		# DNS packet
-		"$PSScriptRoot\Classes\DNS\DnsPacket.ps1"
+	# DNSSEC
+	"$ModuleRoot\Classes\DnsSec\DnsDnskeyRecord.ps1"
+	"$ModuleRoot\Classes\DnsSec\DnsDsRecord.ps1"
+	"$ModuleRoot\Classes\DnsSec\DnsRrsigRecord.ps1"
+	"$ModuleRoot\Classes\DnsSec\DnsNsecRecord.ps1"
+	"$ModuleRoot\Classes\DnsSec\DnsNsec3Record.ps1"
 
-		# Transport
-		"$PSScriptRoot\Classes\Transport\DnsDotClient.ps1"
-		"$PSScriptRoot\Classes\Transport\DnsDohClient.ps1"
-	)
-$ClassFiles | Get-Content |
-Set-Content "D:\PowerShellScripts\DnsTools\0.4\DnsTools-new.psm1" -Encoding UTF8
+	# Resource & EDNS
+	"$ModuleRoot\Classes\Resource\DnsResourceRecord.ps1"
+	"$ModuleRoot\Classes\EDNS-OPT\DnsOptRecord.ps1"
+
+	# DNS packet
+	"$ModuleRoot\Classes\DNS\DnsPacket.ps1"
+
+	# Transport
+	"$ModuleRoot\Classes\Transport\DnsDotClient.ps1"
+	"$ModuleRoot\Classes\Transport\DnsDohClient.ps1"
+)
+
+$OutFile = "$ModuleRoot\DnsTools.psm1"
+$TailFile = "$PSScriptRoot\DnsTools-psm1-Tail.ps1"
+
+If (Test-Path -Path $OutFile) {
+	Remove-Item -Path $OutFile
+}
+
+'#requires -Version 5.0' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'Set-StrictMode -Version Latest' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'# ============================================================' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'# Load Classes' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'# ============================================================' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+
+foreach ($item in $ClassFiles) {
+	if (Test-Path $item) {
+		Get-Content -Path $item | Out-File -Append -FilePath $OutFile -Encoding UTF8
+	} else {
+		Write-Warning "Class file not found: $item"
+	}
+}
+
+'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+Get-Content -Path $TailFile | Out-File -Append -FilePath $OutFile -Encoding UTF8
+
+Write-Host "Generated: $OutFile" -ForegroundColor Green

@@ -15,11 +15,11 @@ class DnsSrvRecord {
 	static [DnsSrvRecord] Parse([DnsBinaryReader]$r, [int]$len)
  
 	{
-		$prival  = $r.ReadUInt16BE()
-		$wgtval  = $r.ReadUInt16BE()
-		$portval = $r.ReadUInt16BE()
-		$tgtval  = $r.ReadName()
-		return [DnsSrvRecord]::new($prival,$wgtval,$portval,$tgtval)
+		$pri  = $r.ReadUInt16BE()
+		$wgt  = $r.ReadUInt16BE()
+		$prt = $r.ReadUInt16BE()
+		$tgt  = $r.ReadName()
+		return [DnsSrvRecord]::new($pri,$wgt,$prt,$tgt)
 	}
 
 	[byte[]]ToWire() 

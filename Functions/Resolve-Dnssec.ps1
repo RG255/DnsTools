@@ -1,18 +1,44 @@
-﻿function Resolve-Dnssec 
+function Resolve-Dnssec
 {
+	<#
+	.SYNOPSIS
+		Performs DNSSEC-validated DNS resolution for a domain name.
+
+	.DESCRIPTION
+		Resolves a DNS name with full DNSSEC validation, verifying the chain of trust from the root zone to the target record.
+
+	.PARAMETER name
+		The fully qualified domain name to resolve.
+
+	.PARAMETER type
+		The DNS record type to query (default: 1 = A record).
+
+	.PARAMETER RootServers
+		Array of root server IP addresses to use for resolution (defaults to module-configured root servers).
+
+	.PARAMETER Trace
+		Enable verbose trace output for debugging DNS resolution.
+	#>
+	[CmdletBinding()]
 	param(
+		[Parameter(Mandatory)]
 		[string]$name,
-		[int]$type = 1,
-		[string[]]$RootServers = @(
-			'198.41.0.4', '199.9.14.201', '192.33.4.12', '199.7.91.13', '192.203.230.10', 
-			'192.5.5.241', '192.112.36.4', '198.97.190.53', '192.36.148.17', '192.58.128.30', 
-			'193.0.14.129', '199.7.83.42', '202.12.27.33'
-		),
+
+		$type = 'A',
+
+		[Parameter(DontShow)]
+		[string[]]$RootServers = $script:RootServerAddresses,
+
 		[switch]$Trace
 	)
 
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
+	# Convert type name to code if needed
+	$TypeCode = ConvertTo-DnsTypeCode -Type $type
+
 	# --- 1. Resolve target RRset ---
-	$iter = Resolve-DnsIterative -name $name -type $type -RootServers $RootServers -Trace:$Trace
+	$iter = Resolve-DnsIterative -name $name -type $TypeCode -RootServers $RootServers -Trace:$Trace
 	if ($iter.Status -ne 'Final') 
 	{
 		return [pscustomobject]@{
@@ -25,9 +51,9 @@
 	}
 
 	$resp    = $iter.Response
-	$answers = $resp.Answers
-	$rrsigs  = $resp.Answers | Where-Object -FilterScript {$_.Type -eq 46}
-	$dnskeys = $resp.Additional | Where-Object -FilterScript {$_.Type -eq 48}
+	$rrsigs  = @($resp.Answers | Where-Object -FilterScript {$_.Type -eq 46})
+	$answers = @($resp.Answers | Where-Object -FilterScript {$_.Type -ne 46})
+	$dnskeys = @($resp.Additional | Where-Object -FilterScript {$_.Type -eq 48})
 
 	if ($answers.Count -eq 0) 
 	{
@@ -68,7 +94,7 @@
 			}
 		}
 
-		$dnskeys = $iterKeys.Response.Answers | Where-Object -FilterScript {$_.Type -eq 48}
+		$dnskeys = @($iterKeys.Response.Answers | Where-Object -FilterScript {$_.Type -eq 48})
 		if ($dnskeys.Count -eq 0) 
 		{
 			return [pscustomobject]@{
@@ -120,7 +146,7 @@
 
 		if ($iterDs.Status -eq 'Final') 
 		{
-			$dsRecords = $iterDs.Response.Answers | Where-Object -FilterScript {$_.Type -eq 43}
+			$dsRecords = @($iterDs.Response.Answers | Where-Object -FilterScript {$_.Type -eq 43})
 		}
 	}
 

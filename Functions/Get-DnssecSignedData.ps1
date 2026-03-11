@@ -1,9 +1,24 @@
-﻿function Get-DnssecSignedData 
+function Get-DnssecSignedData
 {
+	<#
+	.SYNOPSIS
+		Constructs the signed data for DNSSEC signature verification.
+
+	.DESCRIPTION
+		Builds the canonical signed data by combining RRSIG metadata with the canonical RRset for cryptographic signature verification.
+
+	.PARAMETER Rrsig
+		The RRSIG record containing signature metadata.
+
+	.PARAMETER Rrset
+		The RRset being verified by the signature.
+	#>
 	param(
 		[DnsRrsigRecord]$Rrsig,
 		[DnsResourceRecord[]]$Rrset
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	$bytes = New-Object -TypeName System.Collections.Generic.List[byte]
 

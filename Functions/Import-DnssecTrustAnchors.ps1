@@ -1,14 +1,27 @@
-﻿function Import-DnssecTrustAnchors 
+function Import-DnssecTrustAnchors
 {
+	<#
+	.SYNOPSIS
+		Imports DNSSEC trust anchors from a JSON file.
+
+	.DESCRIPTION
+		Loads DNSSEC trust anchors from a JSON file and adds them to the module's trust anchor store.
+
+	.PARAMETER Path
+		The path to the JSON file containing trust anchors.
+	#>
 	param(
 		[string]$Path
 	)
 
-	if (-not (Test-Path $Path)) 
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+
+	if (-not (Test-Path $Path))
 	{throw "Trust anchor file not found: $Path"}
 
 	# Always initialize the table
-	if (-not $script:TrustAnchors) 
+	$trustAnchorsVar = Get-Variable -Name TrustAnchors -Scope Script -ErrorAction SilentlyContinue
+	if (-not $trustAnchorsVar)
 	{$script:TrustAnchors = @{}}
 
 	$json = Get-Content -Raw -Path $Path | ConvertFrom-Json

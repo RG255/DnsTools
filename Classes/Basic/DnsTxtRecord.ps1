@@ -4,19 +4,20 @@ class DnsTxtRecord {
 	DnsTxtRecord([string[]]$strings) 
 	{$this.Strings = $strings}
 
-	static [DnsTxtRecord] Parse([byte[]]$rdata) 
+	static [DnsTxtRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r          = [DnsBinaryReader]::new($rdata)
-		$stringsval = New-Object -TypeName System.Collections.Generic.List[string]
+		$startPos   = $r.Position
+		$endPos     = $startPos + $len
+		$strs = New-Object -TypeName System.Collections.Generic.List[string]
 
-		while ($r.Position -lt $r.Buffer.Length) 
+		while ($r.Position -lt $endPos)
 		{
-			$lenval   = $r.ReadUInt8()
-			$bytesval = $r.ReadBytes($lenval)
-			$null     = $stringsval.Add([System.Text.Encoding]::ASCII.GetString($bytesval))
+			$len   = $r.ReadUInt8()
+			$bytes = $r.ReadBytes($len)
+			$null     = $strs.Add([System.Text.Encoding]::ASCII.GetString($bytes))
 		}
 
-		return [DnsTxtRecord]::new($stringsval.ToArray())
+		return [DnsTxtRecord]::new($strs.ToArray())
 	}
 
 	[byte[]]ToWire() 

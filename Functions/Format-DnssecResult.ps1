@@ -1,5 +1,15 @@
-﻿function Format-DnssecResult 
+function Format-DnssecResult
 {
+	<#
+	.SYNOPSIS
+		Formats a DNSSEC validation result for display.
+
+	.DESCRIPTION
+		Converts a DNSSEC validation result object into a human-readable formatted string.
+
+	.PARAMETER result
+		The DNSSEC validation result object to format.
+	#>
 	param(
 		[psobject]$result
 	)

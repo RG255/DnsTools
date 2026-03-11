@@ -1,8 +1,20 @@
-﻿function Get-DnssecCanonicalRrWire 
+function Get-DnssecCanonicalRrWire
 {
+	<#
+	.SYNOPSIS
+		Converts a DNS resource record to DNSSEC canonical wire format.
+
+	.DESCRIPTION
+		Converts a resource record to its canonical wire format for DNSSEC signature verification as specified in RFC 4034.
+
+	.PARAMETER rr
+		The DNS resource record to convert.
+	#>
 	param(
 		[Parameter(Mandatory)]$rr
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	$w = [DnsBinaryWriter]::new()
 	$w.WriteBytes([byte[]](Get-DnssecCanonicalNameWire -name $rr.Name))

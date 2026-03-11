@@ -1,5 +1,24 @@
-﻿function Get-DnssecNsec3Hash 
+function Get-DnssecNsec3Hash
 {
+	<#
+	.SYNOPSIS
+		Computes the NSEC3 hash for a domain name.
+
+	.DESCRIPTION
+		Calculates the NSEC3 hash of a domain name using the specified algorithm, iterations, and salt as per RFC 5155.
+
+	.PARAMETER name
+		The domain name to hash.
+
+	.PARAMETER Algorithm
+		The hash algorithm (currently only 1=SHA-1 is supported).
+
+	.PARAMETER Iterations
+		The number of additional hash iterations to perform.
+
+	.PARAMETER salt
+		The salt value as a byte array.
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory)]
@@ -14,6 +33,8 @@
 		[Parameter(Mandatory)]
 		[byte[]]$salt
 	)
+
+	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	if ($Algorithm -ne 1) 
 	{throw "Get-DnssecNsec3Hash: Only algorithm 1 (SHA-1) is supported (got $Algorithm)."}

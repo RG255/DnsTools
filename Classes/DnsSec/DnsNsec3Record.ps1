@@ -9,56 +9,88 @@ class DnsNsec3Record {
 
 	DnsNsec3Record(
 		[byte]$alg,[byte]$flags,[uint16]$iter,
-		[byte[]]$salt,[byte[]]$ownerHash,[byte[]]$nextHash,[int[]]$types
+		[byte[]]$salt,[byte[]]$oHash,[byte[]]$nextHash,[int[]]$types
 	)
 	{
 		$this.HashAlgorithm = $alg
 		$this.Flags         = $flags
 		$this.Iterations    = $iter
 		$this.Salt          = $salt
-		$this.OwnerHash     = $ownerHash
+		$this.OwnerHash     = $oHash
 		$this.NextHash      = $nextHash
 		$this.Types         = $types
 	}
 
-	static [DnsNsec3Record] Parse([byte[]]$rdata, [byte[]]$ownerHash)
+	static [byte[]] Base32HexDecode([string]$encoded)
 	{
-		$r          = [DnsBinaryReader]::new($rdata)
-		$algVal     = $r.ReadUInt8()
-		$flagsval   = $r.ReadUInt8()
-		$iterval    = $r.ReadUInt16BE()
-		$saltLenval = $r.ReadUInt8()
-		$saltval    = if ($saltLenval -gt 0) 
-		{$r.ReadBytes($saltLenval)}
-		else 
+		# RFC 4648 Base32hex alphabet: 0-9, A-V (uppercase)
+		$alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUV'
+		$encoded = $encoded.ToUpper().Replace('=', '')
+
+		if ($encoded.Length -eq 0) { return [byte[]]@() }
+
+		$bits = ''
+		foreach ($char in $encoded.ToCharArray())
+		{
+			$val = $alphabet.IndexOf($char)
+			if ($val -eq -1) { throw "Invalid Base32hex character: $char" }
+			$bits += [Convert]::ToString($val, 2).PadLeft(5, '0')
+		}
+
+		$bytes = [System.Collections.Generic.List[byte]]::new()
+		for ($i = 0; $i -lt $bits.Length - 7; $i += 8)
+		{
+			$byteStr = $bits.Substring($i, 8)
+			$bytes.Add([Convert]::ToByte($byteStr, 2))
+		}
+
+		return [byte[]]$bytes.ToArray()
+	}
+
+	static [DnsNsec3Record] Parse([DnsBinaryReader]$r, [int]$len, [string]$ownerName)
+	{
+		$startPos   = $r.Position
+		$endPos     = $startPos + $len
+
+		# Extract owner hash from base32hex-encoded first label of owner name
+		$firstLabel = $ownerName.Split('.')[0].ToUpper()
+		$oHash = [DnsNsec3Record]::Base32HexDecode($firstLabel)
+
+		$alg     = $r.ReadUInt8()
+		$flgs   = $r.ReadUInt8()
+		$iter    = $r.ReadUInt16BE()
+		$saltLen = $r.ReadUInt8()
+		$slt    = if ($saltLen -gt 0)
+		{$r.ReadBytes($saltLen)}
+		else
 		{[byte[]]@()}
 
-		$hashLenval  = $r.ReadUInt8()
-		$nextHashval = $r.ReadBytes($hashLenval)
+		$hashLen  = $r.ReadUInt8()
+		$nxtHash = $r.ReadBytes($hashLen)
 
-		$typesval = New-Object -TypeName System.Collections.Generic.List[int]
-		while ($r.Position -lt $r.Buffer.Length) 
+		$typs = New-Object -TypeName System.Collections.Generic.List[int]
+		while ($r.Position -lt $endPos) 
 		{
-			$blockval = $r.ReadUInt8()
-			$lenval   = $r.ReadUInt8()
-			if ($lenval -lt 1 -or $lenval -gt 32) 
-			{throw "Invalid NSEC3 bitmap length: $lenval"}
-			$bitsval  = $r.ReadBytes($lenval)
-			for ($b = 0; $b -lt $bitsval.Length; $b++) 
+			$block = $r.ReadUInt8()
+			$len   = $r.ReadUInt8()
+			if ($len -lt 1 -or $len -gt 32) 
+			{throw "Invalid NSEC3 bitmap length: $len"}
+			$bits  = $r.ReadBytes($len)
+			for ($b = 0; $b -lt $bits.Length; $b++) 
 			{
 				for ($bit = 0; $bit -lt 8; $bit++) 
 				{
-					if ($bitsval[$b] -band (1 -shl (7-$bit))) 
-					{$null = $typesval.Add($blockval * 256 + $b*8 + $bit)}
+					if ($bits[$b] -band (1 -shl (7-$bit))) 
+					{$null = $typs.Add($block * 256 + $b*8 + $bit)}
 				}
 			}
 		}
 
 		return [DnsNsec3Record]::new(
-			$algVal,$flagsval,$iterval,$saltval,
-			$ownerHash,          # <-- NEW
-			$nextHashval,
-			$typesval.ToArray()
+			$alg,$flgs,$iter,$slt,
+			$oHash,
+			$nxtHash,
+			$typs.ToArray()
 		)
 	}
     

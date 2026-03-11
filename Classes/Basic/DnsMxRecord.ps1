@@ -10,9 +10,9 @@ class DnsMxRecord {
 
 	static [DnsMxRecord] Parse([DnsBinaryReader]$r, [int]$len) 
 	{
-		$prefVal = $r.ReadUInt16BE()
-		$exchVal = $r.ReadName()
-		return [DnsMxRecord]::new($prefVal, $exchVal)
+		$pref = $r.ReadUInt16BE()
+		$exch = $r.ReadName()
+		return [DnsMxRecord]::new($pref, $exch)
 	}
 
 	[byte[]]ToWire() 

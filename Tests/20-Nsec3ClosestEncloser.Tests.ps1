@@ -1,6 +1,5 @@
-﻿using module dnstools
-
 using module dnstools
+
 
 Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 	#
@@ -59,9 +58,9 @@ Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 		-Iterations $Iter `
 		-Salt $Salt
 
-		$result.Name   | Should -Be -ActualValue 'b.example.com'
-		$result.Hash   | Should -Be -ActualValue $hash_b
-		$result.Record | Should -Be -ActualValue $nsec3_b
+		$result.Name   | Should -Be 'b.example.com'
+		$result.Hash   | Should -Be $hash_b
+		$result.Record | Should -Be $nsec3_b
 	}
 
 	It -Name 'Falls back to parent when deeper labels do not exist' -Test {
@@ -90,7 +89,7 @@ Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 		-Iterations $Iter `
 		-Salt $Salt
 
-		$result.Name | Should -Be -ActualValue 'example.com'
+		$result.Name | Should -Be 'example.com'
 	}
 
 	It -Name 'Returns $null when no ancestor exists in the NSEC3 chain' -Test {
@@ -107,6 +106,6 @@ Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 		-Iterations $Iter `
 		-Salt $Salt
 
-		$result | Should -Be -ActualValue $null
+		$result | Should -Be $null
 	}
 }

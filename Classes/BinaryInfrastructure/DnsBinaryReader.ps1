@@ -69,6 +69,9 @@ class DnsBinaryReader {
     # so that pointer jumps do not overwrite the main reader position.
     $pos = $this.Position
 
+    # Track the final position in the wire format (after compression pointer if any)
+    $finalPosition = $null
+
     while ($true)
     {
         # Detect loops BEFORE reading anything at this offset
@@ -86,6 +89,10 @@ class DnsBinaryReader {
         # End of name
         if ($len -eq 0) {
             $pos++
+            # Only update final position if we haven't encountered a pointer yet
+            if ($null -eq $finalPosition) {
+                $finalPosition = $pos
+            }
             break
         }
 
@@ -105,7 +112,12 @@ class DnsBinaryReader {
                 throw "DNS compression pointer out of bounds: $pointer"
             }
 
-            # Move pos to the pointer target, but DO NOT advance $this.Position yet
+            # Set final position to after the 2-byte pointer (only first time)
+            if ($null -eq $finalPosition) {
+                $finalPosition = $pos + 2
+            }
+
+            # Move pos to the pointer target to continue reading the name
             $pos = $pointer
             continue
         }
@@ -129,8 +141,8 @@ class DnsBinaryReader {
         $pos += ($len + 1)
     }
 
-    # Update the main reader position to where the name ended
-    $this.Position = $pos
+    # Update the main reader position to the final wire format position
+    $this.Position = $finalPosition
 
     return ($labels -join '.')
 }

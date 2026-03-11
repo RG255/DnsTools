@@ -25,33 +25,34 @@ class DnsNsecRecord {
 		return ($labels -join '.')
 	}
 
-	static [DnsNsecRecord] Parse([byte[]]$rdata) 
+	static [DnsNsecRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$r        = [DnsBinaryReader]::new($rdata)
-		$nextval = ([DnsNsecRecord]::ReadUncompressedName($r)).ToLowerInvariant()
-		$typesval = New-Object -TypeName System.Collections.Generic.List[int]
+		$startPos = $r.Position
+		$endPos   = $startPos + $len
+		$next = ([DnsNsecRecord]::ReadUncompressedName($r)).ToLowerInvariant()
+		$typs = New-Object -TypeName System.Collections.Generic.List[int]
 
-		while ($r.Position -lt $r.Buffer.Length) 
+		while ($r.Position -lt $endPos) 
 		{
-			$blockval = $r.ReadUInt8()
-			$lenval   = $r.ReadUInt8()
+			$block = $r.ReadUInt8()
+			$len   = $r.ReadUInt8()
 
-			if ($lenval -lt 1 -or $lenval -gt 32) 
-			{throw "Invalid NSEC bitmap length: $lenval"}
+			if ($len -lt 1 -or $len -gt 32) 
+			{throw "Invalid NSEC bitmap length: $len"}
 
-			$bitsval  = $r.ReadBytes($lenval)
+			$bits  = $r.ReadBytes($len)
 
-			for ($b = 0; $b -lt $bitsval.Length; $b++) 
+			for ($b = 0; $b -lt $bits.Length; $b++) 
 			{
 				for ($bit = 0; $bit -lt 8; $bit++) 
 				{
-					if ($bitsval[$b] -band (1 -shl (7-$bit))) 
-					{$null = $typesval.Add($blockval * 256 + $b*8 + $bit)}
+					if ($bits[$b] -band (1 -shl (7-$bit))) 
+					{$null = $typs.Add($block * 256 + $b*8 + $bit)}
 				}
 			}
 		}
 
-		return [DnsNsecRecord]::new($nextval, $typesval.ToArray())
+		return [DnsNsecRecord]::new($next, $typs.ToArray())
 	}
 
 	[byte[]]ToWire() 
