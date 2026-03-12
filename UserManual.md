@@ -6,10 +6,12 @@ DnsTools is a PowerShell module for performing iterative DNS resolution and DNSS
 
 ## Installation
 
-The module is installed in your PowerShell modules directory:
-```
-L:\OneDrive\Documents\WindowsPowerShell\Modules\DnsTools\0.4\
-```
+Copy the `DnsTools\0.4` folder to your PowerShell modules directory:
+
+| PowerShell version | Path |
+|--------------------|------|
+| Windows PowerShell 5.x | `$HOME\Documents\WindowsPowerShell\Modules\DnsTools\0.4\` |
+| PowerShell 7.x | `$HOME\Documents\PowerShell\Modules\DnsTools\0.4\` |
 
 To load the module:
 ```powershell
