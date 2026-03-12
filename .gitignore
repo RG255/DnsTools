@@ -7,3 +7,6 @@ Other/
 
 # Generated cache files
 Helpers/RootHints-Cache.xml
+
+# Per-file edit history archives
+*.history.zip
