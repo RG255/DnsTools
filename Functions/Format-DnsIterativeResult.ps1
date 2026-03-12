@@ -364,6 +364,13 @@ function Format-DnsRecord
                 }
             }
         }
+        256 { # URI
+            if ($rdata) {
+                $props['Priority'] = $rdata.Priority
+                $props['Weight'] = $rdata.Weight
+                $props['Target'] = $rdata.Target
+            }
+        }
         257 { # CAA
             if ($rdata) {
                 $props['Flags'] = $rdata.Flags

@@ -28,6 +28,7 @@ $ClassFiles = @(
 	"$ModuleRoot\Classes\Basic\DnsNaptrRecord.ps1"
 	"$ModuleRoot\Classes\Basic\DnsSshfpRecord.ps1"
 	"$ModuleRoot\Classes\Basic\DnsTlsaRecord.ps1"
+	"$ModuleRoot\Classes\Basic\DnsUriRecord.ps1"
 
 	# DNSSEC
 	"$ModuleRoot\Classes\DnsSec\DnsDnskeyRecord.ps1"

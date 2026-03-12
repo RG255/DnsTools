@@ -846,6 +846,7 @@ $MyVars = @{
 					IXFR       = 251   # Incremental zone transfer
 					AXFR       = 252   # Full zone transfer
 					ANY        = 255   # Request all types
+					URI        = 256   # Uniform Resource Identifier
 					CAA        = 257
 			})
 			Scope  = $VSScript
@@ -1014,6 +1015,7 @@ $MyVars = @{
 					IXFR       = 251
 					AXFR       = 252
 					ANY        = 255
+					URI        = 256
 					CAA        = 257
 			})
 			Scope  = $VSScript

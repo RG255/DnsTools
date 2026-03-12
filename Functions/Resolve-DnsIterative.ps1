@@ -104,14 +104,14 @@ function Resolve-DnsIterative
             # Security/service types
             'TLSA', 'SSHFP', 'SMIMEA', 'SVCB', 'HTTPS',
             # Less common types
-            'NAPTR', 'DNAME', 'LOC', 'HINFO', 'RP', 'AFSDB', 'WKS', 'SPF',
+            'NAPTR', 'DNAME', 'LOC', 'HINFO', 'RP', 'AFSDB', 'WKS', 'SPF', 'URI',
             # Transfer/special types
             'TKEY', 'TSIG', 'IXFR', 'AXFR', 'ANY',
             # Numeric codes (same order, no 12 for PTR)
             1, 28, 15, 16, 5, 2, 6, 33, 257,
             43, 48, 46, 47, 50, 51, 59, 60,
             52, 44, 53, 64, 65,
-            35, 39, 29, 13, 17, 18, 11, 99,
+            35, 39, 29, 13, 17, 18, 11, 99, 256,
             249, 250, 251, 252, 255)]
         $Type,
 

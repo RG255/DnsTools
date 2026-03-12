@@ -85,6 +85,8 @@ class DnsResourceRecord {
 			{return [DnsNsec3Record]::Parse($r, $len, $ownerName)}
 			52
 			{return [DnsTlsaRecord]::Parse($r, $len)}
+			256
+			{return [DnsUriRecord]::Parse($r, $len)}
 			257
 			{return [DnsCaaRecord]::Parse($r, $len)}
 			default

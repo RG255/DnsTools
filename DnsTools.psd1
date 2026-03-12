@@ -8,7 +8,7 @@
 
 @{
 	RootModule    = 'DnsTools.psm1'
-	ModuleVersion = '0.4'
+	ModuleVersion = '0.5'
 	GUID          = '8c594981-48d7-49c2-aa08-6ac52eaffec6'
 	Author        = 'Ray'
 	CompanyName   = 'Ray Labs'

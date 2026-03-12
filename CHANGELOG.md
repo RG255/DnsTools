@@ -1,5 +1,16 @@
 # DnsTools Changelog
 
+## v0.5
+
+### New Record Types
+- URI record type - priority, weight and target URI fields
+
+### Changes
+- Updated `Resolve-DnsIterative` and `Format-DnsIterativeResult` to support URI records
+- Updated `DnsResourceRecord` to handle URI RDATA parsing
+
+---
+
 ## v0.4
 
 ### Features
