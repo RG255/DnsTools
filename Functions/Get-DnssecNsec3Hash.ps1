@@ -66,10 +66,10 @@ function Get-DnssecNsec3Hash
 		# Iterative hashing: for i in 1..Iterations: H( hash | salt )
 		for ($i = 0; $i -lt $Iterations; $i++) 
 		{
-			$input = New-Object -TypeName System.Collections.Generic.List[byte]
-			[void]$input.AddRange($hash)
-			[void]$input.AddRange($salt)
-			$hash = $sha1.ComputeHash([byte[]]$input.ToArray())
+			$input1 = New-Object -TypeName System.Collections.Generic.List[byte]
+			[void]$input1.AddRange($hash)
+			[void]$input1.AddRange($salt)
+			$hash = $sha1.ComputeHash([byte[]]$input1.ToArray())
 		}
 	}
 	finally 

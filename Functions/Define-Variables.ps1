@@ -432,7 +432,7 @@ $MyVars = [Ordered]@{
 				}
 		}
 }
-Publish-Variables
+Publish-Variables -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -479,7 +479,7 @@ $MyVars = [Ordered]@{
 				}
 		}
 }
-Publish-Variables
+Publish-Variables -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -523,7 +523,7 @@ $MyVars = @{
 				}
 		}
 }
-Publish-Variables
+Publish-Variables -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -605,7 +605,7 @@ $MyVars = @{
 				}
 		}
 }
-Publish-Variables
+Publish-Variables -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -754,7 +754,7 @@ $MyVars = @{
 				}
 		}
 }
-Publish-Variables
+Publish-Variables -Variables $MyVars
 # =============================================================================
 # DNS TYPE / CLASS / ALGORITHM / OPTION MAPS
 # =============================================================================
@@ -1202,7 +1202,7 @@ $MyVars = @{
 		}
 	}
 }
-Publish-Variables
+Publish-Variables -Variables $MyVars
 
 # =============================================================================
 # FINAL INITIALIZATION BLOCK
@@ -1272,7 +1272,7 @@ $MyVars = @{
 		}
 
 }}
-Publish-Variables
+Publish-Variables -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
