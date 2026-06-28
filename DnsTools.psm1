@@ -728,6 +728,114 @@ class DnsTlsaRecord {
 		return $w.ToArray()
 	}
 }
+class DnsRpRecord {
+	[string]$MailBox      # Responsible person's mailbox encoded as a domain name (e.g. admin.example.com = admin@example.com)
+	[string]$TxtDomain    # Domain name whose TXT records hold further contact information
+
+	DnsRpRecord([string]$mbox, [string]$txt)
+	{
+		$this.MailBox   = $mbox
+		$this.TxtDomain = $txt
+	}
+
+	static [DnsRpRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$mbox = $r.ReadName()
+		$txt  = $r.ReadName()
+		return [DnsRpRecord]::new($mbox, $txt)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName($this.MailBox)
+		$w.WriteName($this.TxtDomain)
+		return $w.ToArray()
+	}
+}
+class DnsIpsecKeyRecord {
+	[byte]  $Precedence    # Like MX preference - lower is preferred
+	[byte]  $GatewayType   # 0=none, 1=IPv4, 2=IPv6, 3=domain name
+	[byte]  $Algorithm     # 0=none, 1=DSA, 2=RSA, 3=ECDSA
+	[string]$Gateway       # Presentation form: '.', an IPv4/IPv6 address, or a domain name
+	[byte[]]$PublicKey     # Raw public key (base64 in presentation)
+
+	DnsIpsecKeyRecord([byte]$prec, [byte]$gwType, [byte]$alg, [string]$gw, [byte[]]$key)
+	{
+		$this.Precedence  = $prec
+		$this.GatewayType = $gwType
+		$this.Algorithm   = $alg
+		$this.Gateway     = $gw
+		$this.PublicKey   = $key
+	}
+
+	static [DnsIpsecKeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$startPos = $r.Position
+		$prec   = $r.ReadUInt8()
+		$gwType = $r.ReadUInt8()
+		$alg    = $r.ReadUInt8()
+
+		$gw = '.'
+		switch ($gwType)
+		{
+			0 {$gw = '.'}
+			1 {$gw = ([System.Net.IPAddress]::new($r.ReadBytes(4))).ToString()}
+			2 {$gw = ([System.Net.IPAddress]::new($r.ReadBytes(16))).ToString()}
+			3 {$gw = $r.ReadName()}
+			default {throw "Invalid IPSECKEY gateway type: $gwType"}
+		}
+
+		$remaining = $len - ($r.Position - $startPos)
+		$key = if ($remaining -gt 0) {$r.ReadBytes($remaining)} else {[byte[]]@()}
+
+		return [DnsIpsecKeyRecord]::new($prec, $gwType, $alg, $gw, $key)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8($this.Precedence)
+		$w.WriteUInt8($this.GatewayType)
+		$w.WriteUInt8($this.Algorithm)
+		switch ($this.GatewayType)
+		{
+			0 {}
+			1 {$w.WriteBytes([System.Net.IPAddress]::Parse($this.Gateway).GetAddressBytes())}
+			2 {$w.WriteBytes([System.Net.IPAddress]::Parse($this.Gateway).GetAddressBytes())}
+			3 {$w.WriteName($this.Gateway)}
+		}
+		if ($this.PublicKey -and $this.PublicKey.Length -gt 0)
+		{$w.WriteBytes($this.PublicKey)}
+		return $w.ToArray()
+	}
+
+	[string]GetPublicKeyBase64()
+	{return [Convert]::ToBase64String($this.PublicKey)}
+}
+class DnsOpenPgpKeyRecord {
+	[byte[]]$PublicKey     # OpenPGP transferable public key (raw bytes; base64 in presentation)
+
+	DnsOpenPgpKeyRecord([byte[]]$key)
+	{$this.PublicKey = $key}
+
+	static [DnsOpenPgpKeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
+	{
+		$key = if ($len -gt 0) {$r.ReadBytes($len)} else {[byte[]]@()}
+		return [DnsOpenPgpKeyRecord]::new($key)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		if ($this.PublicKey -and $this.PublicKey.Length -gt 0)
+		{$w.WriteBytes($this.PublicKey)}
+		return $w.ToArray()
+	}
+
+	[string]GetPublicKeyBase64()
+	{return [Convert]::ToBase64String($this.PublicKey)}
+}
 class DnsUriRecord {
 	[uint16]$Priority
 	[uint16]$Weight
@@ -1274,6 +1382,12 @@ class DnsResourceRecord {
 			{return [DnsNsec3Record]::Parse($r, $len, $ownerName)}
 			52
 			{return [DnsTlsaRecord]::Parse($r, $len)}
+			17
+			{return [DnsRpRecord]::Parse($r, $len)}
+			45
+			{return [DnsIpsecKeyRecord]::Parse($r, $len)}
+			61
+			{return [DnsOpenPgpKeyRecord]::Parse($r, $len)}
 			256
 			{return [DnsUriRecord]::Parse($r, $len)}
 			257
@@ -1720,6 +1834,11 @@ try
 
 	$PSD1Data = Get-Psd1Data -PathToPsd1file ('{0}' -f $PSD1Path)
 
+	# Root-hints session state (populated by Helpers\Get-RootHints.ps1 during Publish-MyEnvironment;
+	# initialised here so it is always defined under Set-StrictMode).
+	$script:DnsRootHintsVerified        = $null
+	$script:DnsRootHintsBaselineDiffers = $false
+
 	Publish-MyEnvironment
 
 	# Check if we should export all functions (for testing)
@@ -1839,11 +1958,18 @@ try
 				}
 			}
 		}
-		default 
+		default
 		{throw 'Operating System Unknown'}
 	}
+
+	# Root hints: if the verified set loaded at import differs from the trusted baseline, briefly offer to
+	# persist it. Fully isolated - a prompt or elevation failure must never break module import.
+	try
+	{Invoke-RootHintsBaselineOffer}
+	catch
+	{Write-Verbose -Message ('Root-hints baseline offer skipped: {0}' -f $_.Exception.Message)}
 }
-catch 
+catch
 {
 	Write-Warning "Module initialization failed: $($_.Exception.Message)"
 	throw "Unable to initialise module: $ModuleName"

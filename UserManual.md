@@ -6,12 +6,10 @@ DnsTools is a PowerShell module for performing iterative DNS resolution and DNSS
 
 ## Installation
 
-Copy the `DnsTools\0.5` folder to your PowerShell modules directory:
-
-| PowerShell version | Path |
-|--------------------|------|
-| Windows PowerShell 5.x | `$HOME\Documents\WindowsPowerShell\Modules\DnsTools\0.5\` |
-| PowerShell 7.x | `$HOME\Documents\PowerShell\Modules\DnsTools\0.5\` |
+The module is installed in your PowerShell modules directory:
+```
+L:\OneDrive\Documents\WindowsPowerShell\Modules\DnsTools\0.4\
+```
 
 To load the module:
 ```powershell
@@ -58,13 +56,50 @@ Resolve-DnsIterative -Name <domain> -DualStack
 
 **DNSSEC Types**: DS, RRSIG, NSEC, DNSKEY, NSEC3, NSEC3PARAM, CDS, CDNSKEY
 
-**Security Types**: SSHFP, TLSA, SMIMEA
+**Security / Keying Types**: SSHFP, TLSA, IPSECKEY, OPENPGPKEY, SMIMEA
 
-**Service Types**: SVCB, HTTPS
+**Service Types**: SVCB, HTTPS, URI
 
 **Other**: HINFO, LOC, RP, AFSDB, WKS, SPF, TKEY, TSIG, ANY
 
 **Note**: PTR is only available via the `-IPAddr` parameter, not `-Type`.
+
+**Note**: Types with full structured RDATA decoding (named fields in the result, not just raw
+bytes) include the core and DNSSEC types plus SSHFP, TLSA, RP, IPSECKEY, and OPENPGPKEY. RP,
+IPSECKEY, and OPENPGPKEY were added in 0.5: RP exposes `MailBox`/`TxtDomain`; IPSECKEY exposes
+`Precedence`/`GatewayType`/`Algorithm`/`Gateway`/`PublicKey` (gateway types 0=none, 1=IPv4,
+2=IPv6, 3=domain name); OPENPGPKEY exposes the base64 `PublicKey`.
+
+### Root hints and offline resolution
+
+The iterative resolver bootstraps from the root servers. On import, DnsTools fetches the current
+`named.root` from internic over HTTPS (TLS-authenticated) and uses it directly. When that fetch fails
+(offline / blocked) it falls back, in order, to:
+
+1. the **shipped baseline** `Helpers\RootHints-Cache.xml` - admin-only, the trusted offline anchor, and
+2. a writable per-user runtime cache at `%LOCALAPPDATA%\DnsTools\RootHints-Cache.xml`, whose addresses are
+   **filtered against the trusted baseline** before use, so a tampered cache cannot inject forged root IPs.
+
+The baseline is refreshed automatically **at deploy time** (a pre-deploy hook re-fetches `named.root`), so a
+freshly deployed module always ships a current root list.
+
+If, during a session, the verified live fetch differs from the saved baseline (a genuine root change), the
+module offers to persist it:
+
+- In an interactive console you get a 5-second `Y`-to-save prompt (Enter / any other key / timeout = skip).
+- Elsewhere (VS Code console, scheduled tasks, redirected input) you get a one-line notice instead.
+
+Saving writes the verified set over the admin-only baseline, so it elevates once (UAC). **Declining or
+skipping is never an error** - the session simply keeps using the verified set it already loaded. To persist
+on demand at any time:
+
+```powershell
+Update-DnsRootHints            # save the verified set captured this session (one UAC)
+Update-DnsRootHints -Refresh   # re-fetch named.root first, then save
+```
+
+The change-detection compares only the root names and IP addresses; the cache timestamp is ignored, so an
+unchanged root list never triggers a save prompt.
 
 ## Usage Examples
 

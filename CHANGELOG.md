@@ -1,5 +1,22 @@
 # DnsTools Changelog
 
+## v0.5.2
+
+### New Record Types
+- RP (Responsible Person) - `MailBox` and `TxtDomain` fields
+- IPSECKEY - `Precedence`, `GatewayType`, `Algorithm`, `Gateway` (none / IPv4 / IPv6 / domain-name) and `PublicKey`
+- OPENPGPKEY - base64 `PublicKey`
+
+### Changes
+- `Resolve-DnsIterative`, `Format-DnsIterativeResult`, `DnsResourceRecord` and the QtypeMap now handle RP, IPSECKEY and OPENPGPKEY (query + parse + format + round-trip encode)
+- Root hints hardening: the runtime cache now lives at `%LOCALAPPDATA%\DnsTools\RootHints-Cache.xml` and is validated against the trusted (admin-only) baseline before use, so a tampered cache cannot redirect resolution to forged root servers
+- Root hints stay current: the baseline is refreshed at deploy time, and when a live verified fetch differs from the baseline the module offers to persist it (a timed prompt in an interactive console, a one-line notice otherwise) - declining or non-interactive use is never an error
+
+### New Commands
+- `Update-DnsRootHints` - persist the verified root hints to the protected baseline (elevates once; `-Refresh` re-fetches `named.root` first)
+
+---
+
 ## v0.5
 
 ### New Record Types

@@ -824,6 +824,7 @@ $MyVars = @{
 					# --- DNSSEC Types -----------------------------------------------------
 					DS         = 43
 					SSHFP      = 44
+					IPSECKEY   = 45    # IPsec keying material (RFC 4025).
 					RRSIG      = 46
 					NSEC       = 47
 					DNSKEY     = 48
@@ -833,6 +834,7 @@ $MyVars = @{
 					SMIMEA     = 53
 					CDS        = 59    # Child DS
 					CDNSKEY    = 60    # Child DNSKEY
+					OPENPGPKEY = 61    # OpenPGP public key (RFC 7929).
 
 					# --- Service Binding --------------------------------------------------
 					SVCB       = 64
@@ -998,6 +1000,7 @@ $MyVars = @{
 					DNAME      = 39
 					DS         = 43
 					SSHFP      = 44
+					IPSECKEY   = 45
 					RRSIG      = 46
 					NSEC       = 47
 					DNSKEY     = 48
@@ -1007,6 +1010,7 @@ $MyVars = @{
 					SMIMEA     = 53
 					CDS        = 59
 					CDNSKEY    = 60
+					OPENPGPKEY = 61
 					SVCB       = 64
 					HTTPS      = 65
 					SPF        = 99    # Deprecated - TXT replacement.

@@ -292,6 +292,40 @@ function Format-DnsRecord
                 $props['CertificateData'] = ($rdata.CertificateData | ForEach-Object { $_.ToString('x2') }) -join ''
             }
         }
+        17 { # RP
+            if ($rdata) {
+                $props['MailBox'] = $rdata.MailBox
+                $props['TxtDomain'] = $rdata.TxtDomain
+            }
+        }
+        45 { # IPSECKEY
+            if ($rdata) {
+                $props['Precedence'] = $rdata.Precedence
+                $gwTypeName = switch ($rdata.GatewayType) {
+                    0 { 'None' }
+                    1 { 'IPv4' }
+                    2 { 'IPv6' }
+                    3 { 'DomainName' }
+                    default { 'Unknown' }
+                }
+                $props['GatewayType'] = "$gwTypeName($($rdata.GatewayType))"
+                $props['Gateway'] = $rdata.Gateway
+                $ipsecAlgName = switch ($rdata.Algorithm) {
+                    0 { 'None' }
+                    1 { 'DSA' }
+                    2 { 'RSA' }
+                    3 { 'ECDSA' }
+                    default { 'Unknown' }
+                }
+                $props['Algorithm'] = "$ipsecAlgName($($rdata.Algorithm))"
+                $props['PublicKey'] = [Convert]::ToBase64String($rdata.PublicKey)
+            }
+        }
+        61 { # OPENPGPKEY
+            if ($rdata) {
+                $props['PublicKey'] = [Convert]::ToBase64String($rdata.PublicKey)
+            }
+        }
         33 { # SRV
             if ($rdata) {
                 $props['Priority'] = $rdata.Priority

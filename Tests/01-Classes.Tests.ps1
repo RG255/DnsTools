@@ -14,7 +14,7 @@ Describe "Class Loading" {
             "DnsARecord","DnsAaaaRecord","DnsCnameRecord","DnsMxRecord",
             "DnsTxtRecord","DnsSrvRecord","DnsNsRecord","DnsPtrRecord",
             "DnsSoaRecord","DnsCaaRecord","DnsDnameRecord",
-            "DnsNaptrRecord","DnsSshfpRecord","DnsTlsaRecord",
+            "DnsNaptrRecord","DnsSshfpRecord","DnsTlsaRecord","DnsUriRecord",
 
             # DNSSEC
             "DnsDnskeyRecord","DnsDsRecord","DnsRrsigRecord",

@@ -102,7 +102,7 @@ function Resolve-DnsIterative
             # DNSSEC types
             'DS', 'DNSKEY', 'RRSIG', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'CDS', 'CDNSKEY',
             # Security/service types
-            'TLSA', 'SSHFP', 'SMIMEA', 'SVCB', 'HTTPS',
+            'TLSA', 'SSHFP', 'SMIMEA', 'SVCB', 'HTTPS', 'IPSECKEY', 'OPENPGPKEY',
             # Less common types
             'NAPTR', 'DNAME', 'LOC', 'HINFO', 'RP', 'AFSDB', 'WKS', 'SPF', 'URI',
             # Transfer/special types
@@ -110,7 +110,7 @@ function Resolve-DnsIterative
             # Numeric codes (same order, no 12 for PTR)
             1, 28, 15, 16, 5, 2, 6, 33, 257,
             43, 48, 46, 47, 50, 51, 59, 60,
-            52, 44, 53, 64, 65,
+            52, 44, 53, 64, 65, 45, 61,
             35, 39, 29, 13, 17, 18, 11, 99, 256,
             249, 250, 251, 252, 255)]
         $Type,

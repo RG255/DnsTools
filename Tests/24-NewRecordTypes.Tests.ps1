@@ -260,6 +260,121 @@ Describe "TLSA Record Parsing and Encoding" {
 	}
 }
 
+Describe "RP Record Parsing and Encoding" {
+	It "Parses an RP record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName("admin.example.com")
+		$w.WriteName("contact.example.com")
+		$bytes = $w.ToArray()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$rp = [DnsRpRecord]::Parse($reader, $bytes.Length)
+
+		$rp.MailBox | Should -Be "admin.example.com"
+		$rp.TxtDomain | Should -Be "contact.example.com"
+	}
+
+	It "Round-trips RP RDATA correctly" {
+		$rp = [DnsRpRecord]::new("hostmaster.example.org", "info.example.org")
+		$bytes = $rp.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsRpRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.MailBox | Should -Be "hostmaster.example.org"
+		$parsed.TxtDomain | Should -Be "info.example.org"
+	}
+}
+
+Describe "IPSECKEY Record Parsing and Encoding" {
+	It "Parses an IPSECKEY record with an IPv4 gateway" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt8(10)  # precedence
+		$w.WriteUInt8(1)   # gateway type: IPv4
+		$w.WriteUInt8(2)   # algorithm: RSA
+		$w.WriteBytes([System.Net.IPAddress]::Parse("192.0.2.38").GetAddressBytes())
+		$key = [byte[]](1..16)
+		$w.WriteBytes($key)
+		$bytes = $w.ToArray()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$ipseckey = [DnsIpsecKeyRecord]::Parse($reader, $bytes.Length)
+
+		$ipseckey.Precedence | Should -Be 10
+		$ipseckey.GatewayType | Should -Be 1
+		$ipseckey.Algorithm | Should -Be 2
+		$ipseckey.Gateway | Should -Be "192.0.2.38"
+		$ipseckey.PublicKey.Length | Should -Be 16
+	}
+
+	It "Round-trips an IPSECKEY with no gateway (type 0)" {
+		$key = [byte[]](0..31)
+		$ipseckey = [DnsIpsecKeyRecord]::new(1, 0, 2, ".", $key)
+		$bytes = $ipseckey.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsIpsecKeyRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.Precedence | Should -Be 1
+		$parsed.GatewayType | Should -Be 0
+		$parsed.Algorithm | Should -Be 2
+		$parsed.Gateway | Should -Be "."
+		$parsed.PublicKey.Length | Should -Be 32
+	}
+
+	It "Round-trips an IPSECKEY with a domain-name gateway (type 3)" {
+		$key = [byte[]](1..20)
+		$ipseckey = [DnsIpsecKeyRecord]::new(5, 3, 3, "gateway.example.com", $key)
+		$bytes = $ipseckey.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsIpsecKeyRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.GatewayType | Should -Be 3
+		$parsed.Gateway | Should -Be "gateway.example.com"
+		$parsed.PublicKey.Length | Should -Be 20
+	}
+
+	It "Round-trips an IPSECKEY with an IPv6 gateway (type 2)" {
+		$key = [byte[]](1..8)
+		$ipseckey = [DnsIpsecKeyRecord]::new(2, 2, 2, "2001:db8::1", $key)
+		$bytes = $ipseckey.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsIpsecKeyRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.GatewayType | Should -Be 2
+		$parsed.Gateway | Should -Be "2001:db8::1"
+		$parsed.PublicKey.Length | Should -Be 8
+	}
+}
+
+Describe "OPENPGPKEY Record Parsing and Encoding" {
+	It "Parses an OPENPGPKEY record" {
+		$key = [byte[]](1..50)
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteBytes($key)
+		$bytes = $w.ToArray()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$pgp = [DnsOpenPgpKeyRecord]::Parse($reader, $bytes.Length)
+
+		$pgp.PublicKey.Length | Should -Be 50
+	}
+
+	It "Round-trips OPENPGPKEY RDATA correctly" {
+		$key = [byte[]](0..99)
+		$pgp = [DnsOpenPgpKeyRecord]::new($key)
+		$bytes = $pgp.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsOpenPgpKeyRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.PublicKey.Length | Should -Be 100
+		$parsed.GetPublicKeyBase64() | Should -Be ([Convert]::ToBase64String($key))
+	}
+}
+
 Describe "MX Record Enhancement" {
 	It "Parses MX record correctly" {
 		$w = [DnsBinaryWriter]::new()
@@ -291,5 +406,47 @@ Describe "SRV Record Enhancement" {
 		$srv.Weight | Should -Be 20
 		$srv.Port | Should -Be 80
 		$srv.Target | Should -Be "server.example.com"
+	}
+}
+
+Describe "URI Record Parsing and Encoding" {
+	It "Parses a URI record" {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteUInt16BE(10)  # priority
+		$w.WriteUInt16BE(1)   # weight
+		$targetBytes = [System.Text.Encoding]::ASCII.GetBytes("https://example.com/path")
+		$w.WriteBytes($targetBytes)
+
+		$bytes = $w.ToArray()
+		$reader = [DnsBinaryReader]::new($bytes)
+		$uri = [DnsUriRecord]::Parse($reader, $bytes.Length)
+
+		$uri.Priority | Should -Be 10
+		$uri.Weight | Should -Be 1
+		$uri.Target | Should -Be "https://example.com/path"
+	}
+
+	It "Round-trips URI RDATA correctly" {
+		$uri = [DnsUriRecord]::new(20, 5, "ftp://files.example.org/pub")
+		$bytes = $uri.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsUriRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.Priority | Should -Be 20
+		$parsed.Weight | Should -Be 5
+		$parsed.Target | Should -Be "ftp://files.example.org/pub"
+	}
+
+	It "Handles empty URI target" {
+		$uri = [DnsUriRecord]::new(0, 0, "")
+		$bytes = $uri.ToWire()
+
+		$reader = [DnsBinaryReader]::new($bytes)
+		$parsed = [DnsUriRecord]::Parse($reader, $bytes.Length)
+
+		$parsed.Priority | Should -Be 0
+		$parsed.Weight | Should -Be 0
+		$parsed.Target | Should -Be ""
 	}
 }

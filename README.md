@@ -9,7 +9,7 @@ starting from the root servers and following the delegation chain to authoritati
 - Iterative DNS resolution (root -> TLD -> authoritative)
 - Full DNSSEC chain validation (DNSKEY, DS, RRSIG, NSEC, NSEC3)
 - DNS over TLS (DoT) and DNS over HTTPS (DoH) transport
-- Support for A, AAAA, MX, NS, TXT, CNAME, SRV, CAA, DNAME, NAPTR, PTR, SOA, SSHFP, TLSA record types
+- Support for A, AAAA, MX, NS, TXT, CNAME, SRV, CAA, DNAME, NAPTR, PTR, SOA, SSHFP, TLSA, RP, IPSECKEY, OPENPGPKEY record types
 - DNSSEC trust anchor management
 
 ## Requirements
