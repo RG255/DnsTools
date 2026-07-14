@@ -54,7 +54,7 @@ function Get-RootHintsObject
 	$RHDataIn = $null
 	try
 	{
-		$RHDataIn = -join [char[]](Invoke-WebRequest -Uri $URI_RH -UseBasicParsing).Content
+		$RHDataIn = -join [char[]](Invoke-WebRequest -Uri $URI_RH -UseBasicParsing -TimeoutSec 30).Content
 	}
 	catch
 	{

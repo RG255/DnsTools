@@ -41,7 +41,7 @@ function Update-DnssecTrustAnchors
 
     try {
         Write-Verbose "Fetching trust anchors from $ianaUrl"
-        $response = Invoke-WebRequest -Uri $ianaUrl -UseBasicParsing -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $ianaUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
         [xml]$xml = $response.Content
     }
     catch {

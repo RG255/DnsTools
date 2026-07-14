@@ -8,12 +8,29 @@
 
 @{
 	RootModule    = 'DnsTools.psm1'
-	ModuleVersion = '0.5'
+	ModuleVersion = '0.6'
 	GUID          = '8c594981-48d7-49c2-aa08-6ac52eaffec6'
 	Author        = 'Ray'
 	CompanyName   = 'Ray Labs'
 	Copyright     = '(c) 2026 Ray. All rights reserved.'
 	Description   = 'A full DNS, DNSSEC, DoT, DoH, and iterative resolver toolkit for PowerShell.'
+	# Explicit exports so PowerShell AUTO-LOADS this module on first use of any command
+	# (no manual Import-Module). These are all cross-platform (no FunctionsWindows), so
+	# the list is the full set on every OS. Keep in sync with the runtime export set.
+	FunctionsToExport = @(
+		'Add-DnssecTrustAnchor', 'ConvertFrom-DnsClassCode', 'ConvertFrom-DnsPacket', 'ConvertFrom-DnssecAlgorithmCode',
+		'ConvertFrom-DnsTypeCode', 'ConvertTo-DnsClassCode', 'ConvertTo-DnssecAlgorithmCode', 'ConvertTo-DnsTypeCode',
+		'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName', 'Get-DnssecTrustAnchors',
+		'Import-DnssecTrustAnchors', 'Invoke-DnsUdpQuery', 'Invoke-RootHintsBaselineOffer', 'New-DnsQueryPacket',
+		'Resolve-DnsIterative', 'Resolve-Dnssec', 'Resolve-DnssecChain', 'Resolve-DnssecName',
+		'Test-DnssecName', 'Test-DnssecValidation', 'Update-DnsRootHints', 'Update-DnssecTrustAnchors'
+	)
+	CmdletsToExport   = @()
+	# '*' not @(): the psm1 exports its variable vocabulary via Export-ModuleMember
+	# -Variable; a manifest @() filters that to nothing. Autoload runs off
+	# FunctionsToExport above independently. (Regression fixed 2026-07-05.)
+	VariablesToExport = '*'
+	AliasesToExport   = @()
 	PrivateData   = @{
 		PSData     = @{
 			Tags       = @(
