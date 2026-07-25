@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # Module paths / identity
 # ============================================================
 
@@ -89,23 +89,24 @@ Function Publish-Variables
 {
 	<#
 			.SYNOPSIS
-			Takes the definitions in $MyVars and processes them into the variables defined.
-        
+			Takes the definitions in $Variables and processes them into the variables defined.
+
 			.DESCRIPTION
 			As Above
-        
+
 			.EXAMPLE
 			Publish-Variables is called from the file Define-Variables.ps1 which is executed as part
 			of this psm1 file when the module is initialised.
-        
+
 			.EXAMPLE
-			Publish-Variables
+			Publish-Variables -Variables $MyVars
 	#>
+	Param ([hashtable]$Variables)
 	Try
 	{
-		ForEach ($VarSet in ($MyVars.GetEnumerator() | Sort-Object -Property key).Name)
+		ForEach ($VarSet in ($Variables.GetEnumerator() | Sort-Object -Property key).Name)
 		{
-			ForEach ($Item in ($MyVars[$VarSet].GetEnumerator() | Sort-Object -Property key).Name)
+			ForEach ($Item in ($Variables[$VarSet].GetEnumerator() | Sort-Object -Property key).Name)
 			{
 				$Params = @{
 					Name   = $null
@@ -113,20 +114,20 @@ Function Publish-Variables
 					Option = $null
 					Scope  = $null
 				}
-				If (Test-Path -Path ('Variable:{0}:{1}' -f $MyVars[$VarSet][$Item].Scope, $Item))
+				If (Test-Path -Path ('Variable:{0}:{1}' -f $Variables[$VarSet][$Item].Scope, $Item))
 				{
 					$Params = @{
 						Name  = $Item
-						Scope = $MyVars[$VarSet][$Item].Scope
+						Scope = $Variables[$VarSet][$Item].Scope
 					}
 					If ($Params.Scope -inotmatch $VOConstant)
 					{Remove-Variable @Params -Force}
 				}
 				$Params = @{
 					Name   = $Item
-					Value  = $MyVars[$VarSet][$Item].Value
-					Option = $MyVars[$VarSet][$Item].Option
-					Scope  = $MyVars[$VarSet][$Item].Scope
+					Value  = $Variables[$VarSet][$Item].Value
+					Option = $Variables[$VarSet][$Item].Option
+					Scope  = $Variables[$VarSet][$Item].Scope
 				}
 				New-Variable @Params -ErrorAction Stop
 				Export-ModuleMember -Variable $Item -ErrorAction Stop
@@ -171,6 +172,11 @@ try
 	)
 
 	$PSD1Data = Get-Psd1Data -PathToPsd1file ('{0}' -f $PSD1Path)
+
+	# Root-hints session state (populated by Helpers\Get-RootHints.ps1 during Publish-MyEnvironment;
+	# initialised here so it is always defined under Set-StrictMode).
+	$script:DnsRootHintsVerified        = $null
+	$script:DnsRootHintsBaselineDiffers = $false
 
 	Publish-MyEnvironment
 
@@ -291,11 +297,18 @@ try
 				}
 			}
 		}
-		default 
+		default
 		{throw 'Operating System Unknown'}
 	}
+
+	# Root hints: if the verified set loaded at import differs from the trusted baseline, briefly offer to
+	# persist it. Fully isolated - a prompt or elevation failure must never break module import.
+	try
+	{Invoke-RootHintsBaselineOffer}
+	catch
+	{Write-Verbose -Message ('Root-hints baseline offer skipped: {0}' -f $_.Exception.Message)}
 }
-catch 
+catch
 {
 	Write-Warning "Module initialization failed: $($_.Exception.Message)"
 	throw "Unable to initialise module: $ModuleName"
