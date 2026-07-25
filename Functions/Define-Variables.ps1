@@ -1,34 +1,34 @@
 ﻿<#
 		.SYNOPSIS
-		DNS and DNSSEC resolution, validation, and module‑level initialization.
+		DNS and DNSSEC resolution, validation, and module-level initialization.
 
 		.DESCRIPTION
 		This module provides a complete toolkit for performing DNS iterative resolution,
-		DNSSEC validation, chain‑of‑trust evaluation, trust‑anchor management, and
-		wire‑format parsing. It is designed for deterministic, standards‑compliant
-		DNSSEC analysis and forensic‑grade DNS inspection.
+		DNSSEC validation, chain-of-trust evaluation, trust-anchor management, and
+		wire-format parsing. It is designed for deterministic, standards-compliant
+		DNSSEC analysis and forensic-grade DNS inspection.
 
 		The module initializes:
-			• Root server hints
-			• DNSSEC trust anchors
-			• DNS record type maps
-			• DNS class maps
-			• DNSSEC algorithm and digest maps
-			• EDNS option maps
-			• RCODE and OpCode maps
-			• TLSA, SSHFP, and NSEC3 flag maps
-			• Module‑level variables and environment metadata
+			- Root server hints
+			- DNSSEC trust anchors
+			- DNS record type maps
+			- DNS class maps
+			- DNSSEC algorithm and digest maps
+			- EDNS option maps
+			- RCODE and OpCode maps
+			- TLSA, SSHFP, and NSEC3 flag maps
+			- Module-level variables and environment metadata
 
 		This header replaces the original module header and includes a consolidated
 		reference for deprecated DNS record types and their modern replacements.
 
 		.NOTES
-		This module is part of a DNSSEC‑focused toolkit emphasizing:
-			• Deterministic validation
-			• Canonical wire‑format correctness
-			• Full chain‑of‑trust traversal
-			• Negative validation (NSEC/NSEC3)
-			• Reproducible debugging and trace output
+		This module is part of a DNSSEC-focused toolkit emphasizing:
+			- Deterministic validation
+			- Canonical wire-format correctness
+			- Full chain-of-trust traversal
+			- Negative validation (NSEC/NSEC3)
+			- Reproducible debugging and trace output
 
 		Ordering of maps, variables, and function tables is intentional and preserved.
 
@@ -39,43 +39,43 @@
 		The following DNS RR types are deprecated, obsolete, or SHOULD NOT be used.
 		Replacement guidance is included for operational clarity.
 
-		• HINFO (13)
+		- HINFO (13)
 				Deprecated due to fingerprinting and privacy concerns.
-				Replacement: Do not publish; document host info out‑of‑band.
+				Replacement: Do not publish; document host info out-of-band.
 
-		• RP (17)
+		- RP (17)
 				Deprecated; contact information should not be stored in DNS.
 				Replacement: WHOIS or HTTPS contact pages.
 
-		• AFSDB (18)
+		- AFSDB (18)
 				Obsolete; AFS ecosystem is effectively dead.
 				Replacement: None; do not use.
 
-		• LOC (29)
+		- LOC (29)
 				Not formally deprecated but discouraged due to privacy concerns.
-				Replacement: Avoid; document location out‑of‑band.
+				Replacement: Avoid; document location out-of-band.
 
-		• SPF (99)
+		- SPF (99)
 				Deprecated by RFC 7208.
 				Replacement: TXT records.
 
-		• TKEY (249)
+		- TKEY (249)
 				Deprecated; replaced by TSIG for authenticated dynamic updates.
 				Replacement: TSIG (250).
 
-		• TA (32768)
-				Deprecated; replaced by DS‑based trust anchors configured out‑of‑band.
+		- TA (32768)
+				Deprecated; replaced by DS-based trust anchors configured out-of-band.
 				Replacement: DS chain of trust.
 
-		• DLV (32769)
+		- DLV (32769)
 				Deprecated; IETF retired DLV.
 				Replacement: Standard DNSSEC validation via DS chain.
 
-		• CERT (37)
+		- CERT (37)
 				Not deprecated but largely superseded for DANE usage.
-				Replacement: TLSA (52) for DANE‑style bindings.
+				Replacement: TLSA (52) for DANE-style bindings.
 
-		• KX (36)
+		- KX (36)
 				Obsolete; replaced by MX for mail and SRV/SVCB/HTTPS for service endpoints.
 				Replacement: MX, SRV, SVCB, HTTPS.
 
@@ -84,20 +84,20 @@
 		# ---------------------------------------------------------------------------
 
 		This module implements:
-			• Canonical name and RR canonicalization
-			• RRSIG validation (time windows, key matching, digest matching)
-			• DNSKEY ↔ DS validation
-			• NSEC and NSEC3 negative validation
-			• Opt‑Out logic for NSEC3
-			• Closest encloser and next‑closer derivation
-			• Trust anchor enforcement
+			- Canonical name and RR canonicalization
+			- RRSIG validation (time windows, key matching, digest matching)
+			- DNSKEY <-> DS validation
+			- NSEC and NSEC3 negative validation
+			- Opt-Out logic for NSEC3
+			- Closest encloser and next-closer derivation
+			- Trust anchor enforcement
 
 		DNSSEC validation relies on:
-			• DnssecAlgorithmMap
-			• DnssecDigestMap
-			• TypeCoveredMap
-			• Nsec3FlagsMap
-			• TrustAnchorsInitialized
+			- DnssecAlgorithmMap
+			- DnssecDigestMap
+			- TypeCoveredMap
+			- Nsec3FlagsMap
+			- TrustAnchorsInitialized
 
 		# ---------------------------------------------------------------------------
 		# ROOT HINTS AND TRUST ANCHORS
@@ -114,7 +114,7 @@
 				Import-DnssecTrustAnchors
 				Update-DnssecTrustAnchors
 
-		Trust anchors are stored in module‑scope variables and used by:
+		Trust anchors are stored in module-scope variables and used by:
 				Resolve-Dnssec
 				Resolve-DnssecChain
 				Test-DnssecValidation
@@ -125,40 +125,40 @@
 		# ---------------------------------------------------------------------------
 
 		Exported Functions:
-				• DNS iterative resolution
-				• DNSSEC validation and chain traversal
-				• Trust anchor management
-				• Type/class/algorithm conversion utilities
-				• Wire‑format packet parsing and UDP query generation
+				- DNS iterative resolution
+				- DNSSEC validation and chain traversal
+				- Trust anchor management
+				- Type/class/algorithm conversion utilities
+				- Wire-format packet parsing and UDP query generation
 
 		Internal Functions:
-				• Canonicalization helpers
-				• NSEC/NSEC3 logic
-				• Signature validation
-				• Wire‑format encoding/decoding
-				• Transport safety wrappers
-				• Trace and formatting helpers
+				- Canonicalization helpers
+				- NSEC/NSEC3 logic
+				- Signature validation
+				- Wire-format encoding/decoding
+				- Transport safety wrappers
+				- Trace and formatting helpers
 
 		Maps:
-				• QtypeMap - DNS RR type ↔ code mapping
-				• TypeCoveredMap - RRSIG type‑covered mapping
-				• DnsClassMap - DNS class ↔ code mapping
-				• DnssecAlgorithmMap - DNSSEC algorithm codes
-				• DnssecDigestMap - DS digest algorithms
-				• EdnsOptionMap - EDNS option codes
-				• RcodeMap - DNS response codes
-				• DnsOpCodeMap - DNS operation codes
-				• TLSA, SSHFP, NSEC3 maps - protocol‑specific constants
+				- QtypeMap - DNS RR type <-> code mapping
+				- TypeCoveredMap - RRSIG type-covered mapping
+				- DnsClassMap - DNS class <-> code mapping
+				- DnssecAlgorithmMap - DNSSEC algorithm codes
+				- DnssecDigestMap - DS digest algorithms
+				- EdnsOptionMap - EDNS option codes
+				- RcodeMap - DNS response codes
+				- DnsOpCodeMap - DNS operation codes
+				- TLSA, SSHFP, NSEC3 maps - protocol-specific constants
 
 		# ---------------------------------------------------------------------------
 		# MAINTENANCE NOTES
 		# ---------------------------------------------------------------------------
 
-		• If FunctionExportTable is modified, regenerate DnsTools.psm1.
-		• Ordering of maps is intentional; do not reorder unless updating RFCs.
-		• Deprecated RR types remain in maps for completeness and RRSIG coverage.
-		• This module is designed for PowerShell 7+ compatibility.
-		• All changes should preserve deterministic behavior and reproducibility.
+		- If FunctionExportTable is modified, regenerate DnsTools.psm1.
+		- Ordering of maps is intentional; do not reorder unless updating RFCs.
+		- Deprecated RR types remain in maps for completeness and RRSIG coverage.
+		- This module is designed for PowerShell 7+ compatibility.
+		- All changes should preserve deterministic behavior and reproducibility.
 
 #>
 # =============================================================================
@@ -167,8 +167,8 @@
 # This table defines which functions are exported (public API) and which remain
 # internal to the module. Ordering is intentional and preserved.
 #
-# Exported functions form the user‑facing DNS/DNSSEC toolkit.
-# Internal functions support canonicalization, wire‑format parsing, DNSSEC
+# Exported functions form the user-facing DNS/DNSSEC toolkit.
+# Internal functions support canonicalization, wire-format parsing, DNSSEC
 # validation, and transport safety.
 #
 # NOTE:
@@ -184,10 +184,10 @@ $script:FunctionExportTable = @{
 		'Resolve-DnsIterative' = $true
 				# Performs full iterative DNS resolution from the root downward.
 				# Uses: RootServerAddresses, QtypeMap, DnsClassMap.
-				# Public entry point for non‑DNSSEC resolution.
+				# Public entry point for non-DNSSEC resolution.
 
 		'Resolve-Dnssec' = $true
-				# Performs DNSSEC‑aware resolution.
+				# Performs DNSSEC-aware resolution.
 				# Validates signatures, DS/DNSKEY chains, and negative proofs.
 				# Uses: Resolve-DnsIterative, Test-DnssecValidation, RRSIG/NSEC/NSEC3 logic.
 
@@ -197,7 +197,7 @@ $script:FunctionExportTable = @{
 				# Uses: DnssecAlgorithmMap, DnssecDigestMap, TypeCoveredMap.
 
 		'Resolve-DnssecName' = $true
-				# High‑level wrapper for resolving a single name with DNSSEC validation.
+				# High-level wrapper for resolving a single name with DNSSEC validation.
 				# Combines resolution + chain validation + formatting.
 
 		'Test-DnssecValidation' = $true
@@ -224,39 +224,47 @@ $script:FunctionExportTable = @{
 
 
 		# -------------------------------------------------------------------------
+		# PUBLIC ROOT HINTS MANAGEMENT
+		# -------------------------------------------------------------------------
+
+		'Update-DnsRootHints' = $true
+				# Persists the verified root hints captured this session to the protected baseline (elevates once).
+
+
+		# -------------------------------------------------------------------------
 		# PUBLIC TYPE/CLASS/ALGORITHM CONVERSION UTILITIES
 		# -------------------------------------------------------------------------
 
 		'ConvertTo-DnsTypeCode' = $true
-				# Converts RR type name → numeric code using QtypeMap.
+				# Converts RR type name -> numeric code using QtypeMap.
 
 		'ConvertFrom-DnsTypeCode' = $true
-				# Converts numeric RR type code → name using QtypeMap.
+				# Converts numeric RR type code -> name using QtypeMap.
 
 		'Format-DnsTypeName' = $true
 				# Normalizes RR type names for display and logging.
 
 		'ConvertTo-DnsClassCode' = $true
-				# Converts DNS class name → numeric code.
+				# Converts DNS class name -> numeric code.
 
 		'ConvertFrom-DnsClassCode' = $true
-				# Converts numeric DNS class code → name.
+				# Converts numeric DNS class code -> name.
 
 		'Format-DnsClassName' = $true
 				# Normalizes class names for display.
 
 		'ConvertTo-DnssecAlgorithmCode' = $true
-				# Converts DNSSEC algorithm name → numeric code using DnssecAlgorithmMap.
+				# Converts DNSSEC algorithm name -> numeric code using DnssecAlgorithmMap.
 
 		'ConvertFrom-DnssecAlgorithmCode' = $true
-				# Converts numeric DNSSEC algorithm code → name.
+				# Converts numeric DNSSEC algorithm code -> name.
 
 		'Format-DnssecAlgorithmName' = $true
 				# Normalizes algorithm names for display.
 
 
 		# -------------------------------------------------------------------------
-		# PUBLIC WIRE‑FORMAT UTILITIES
+		# PUBLIC WIRE-FORMAT UTILITIES
 		# -------------------------------------------------------------------------
 
 		'ConvertFrom-DnsPacket' = $true
@@ -275,7 +283,7 @@ $script:FunctionExportTable = @{
 		# INTERNAL FUNCTIONS - NOT EXPORTED
 		# -------------------------------------------------------------------------
 		# These functions implement the core mechanics of DNSSEC, canonicalization,
-		# wire‑format parsing, and transport safety. They are intentionally internal
+		# wire-format parsing, and transport safety. They are intentionally internal
 		# to prevent accidental misuse and to maintain a clean public API.
 
 		'Write-Trace' = $false
@@ -320,6 +328,10 @@ $script:FunctionExportTable = @{
 		'Initialize-DnssecTrustAnchors' = $false
 				# Loads trust anchors at module initialization.
 
+		'Invoke-RootHintsBaselineOffer' = $false
+				# Module-init helper: offers to persist verified root hints when they differ from the baseline.
+				# Auto-invoked once at import; NOT public (exporting it would let users re-trigger the elevating offer).
+
 
 		# -------------------------------------------------------------------------
 		# INTERNAL DNSSEC FUNCTIONS - NOT EXPORTED
@@ -342,10 +354,10 @@ $script:FunctionExportTable = @{
 				# Computes DS digest from DNSKEY.
 
 		'Get-DnssecKeyDigestHex' = $false
-				# Hex‑encoded DS digest.
+				# Hex-encoded DS digest.
 
 		'Get-DnssecNsec3Hash' = $false
-				# Computes NSEC3 hash for closest‑encloser logic.
+				# Computes NSEC3 hash for closest-encloser logic.
 
 		'Get-DnssecSigningKey' = $false
 				# Selects the correct DNSKEY for an RRSIG.
@@ -357,25 +369,25 @@ $script:FunctionExportTable = @{
 				# Validates RRSIG over an RRset.
 
 		'Test-DnssecDsForDnskey' = $false
-				# Validates DS ↔ DNSKEY relationship.
+				# Validates DS <-> DNSKEY relationship.
 
 		'Test-DnssecChain' = $false
 				# Validates full DNSSEC chain of trust.
 
 		'Test-DnssecNsec3Nodata' = $false
-				# Validates NSEC3‑based NODATA proofs.
+				# Validates NSEC3-based NODATA proofs.
 
 		'Test-DnssecNsec3Nxdomain' = $false
-				# Validates NSEC3‑based NXDOMAIN proofs.
+				# Validates NSEC3-based NXDOMAIN proofs.
 
 		'Test-DnssecNsec3OptOut' = $false
-				# Validates NSEC3 Opt‑Out behavior.
+				# Validates NSEC3 Opt-Out behavior.
 
 		'Find-DnssecNsec3ClosestEncloser' = $false
 				# Finds closest encloser for NSEC3 proofs.
 
 		'Find-DnssecNsec3NextCloser' = $false
-				# Computes next‑closer name for NSEC3 proofs.
+				# Computes next-closer name for NSEC3 proofs.
 
 		'Test-DnssecAnchoredDnskey' = $false
 				# Validates DNSKEY against trust anchors.
@@ -384,24 +396,24 @@ $script:FunctionExportTable = @{
 				# Performs cryptographic signature validation.
 
 		'ConvertTo-ReverseDnsName' = $false
-				# Converts IP addresses to reverse‑DNS names.
+				# Converts IP addresses to reverse-DNS names.
 }
 # =============================================================================
-# VARIABLE DEFINITIONS AND MODULE‑LEVEL STATE
+# VARIABLE DEFINITIONS AND MODULE-LEVEL STATE
 # =============================================================================
-# These blocks define constant, read‑only, and mutable variables used throughout
+# These blocks define constant, read-only, and mutable variables used throughout
 # the module. Ordering is intentional and preserved.
 #
 # Variable groups:
-#   • N00ConstantVars   - Script‑scope constants (immutable)
-#   • N01ReadOnlyVars   - Script‑scope read‑only values
-#   • N02ReadOnlyVars   - Environment and module metadata
-#   • N03OtherVars      - Mutable runtime state (logging, console, etc.)
-#   • N09Finalise       - Final initialization (root hints, maps, trust anchors)
+#   - N00ConstantVars   - Script-scope constants (immutable)
+#   - N01ReadOnlyVars   - Script-scope read-only values
+#   - N02ReadOnlyVars   - Environment and module metadata
+#   - N03OtherVars      - Mutable runtime state (logging, console, etc.)
+#   - N09Finalise       - Final initialization (root hints, maps, trust anchors)
 #
 # NOTE:
 #   Constants cannot be reloaded without restarting PowerShell.
-#   Read‑only variables enforce module integrity.
+#   Read-only variables enforce module integrity.
 #   Mutable variables support runtime behavior (logging, tracing, etc.).
 # =============================================================================
 
@@ -410,7 +422,7 @@ $script:FunctionExportTable = @{
 # CONSTANT VARIABLES (IMMUTABLE)
 # -------------------------------------------------------------------------
 # These values define the constant semantics used throughout the module.
-# They are script‑scope and read‑only to prevent accidental modification.
+# They are script-scope and read-only to prevent accidental modification.
 # -------------------------------------------------------------------------
 
 $MyVars = [Ordered]@{
@@ -439,10 +451,10 @@ Publish-Variables -Variables $MyVars
 # CONSTANT FLAGS FOR INFORMATION OUTPUT
 # -------------------------------------------------------------------------
 # These flags control optional informational output for:
-#   • Variables
-#   • Common functions
-#   • OS‑specific functions (Windows/Linux/Mac)
-# They are read‑only to ensure consistent behavior.
+#   - Variables
+#   - Common functions
+#   - OS-specific functions (Windows/Linux/Mac)
+# They are read-only to ensure consistent behavior.
 # -------------------------------------------------------------------------
 
 $MyVars = [Ordered]@{
@@ -483,10 +495,10 @@ Publish-Variables -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
-# READ‑ONLY VARIABLES (SCOPE & OPTION CONSTANTS)
+# READ-ONLY VARIABLES (SCOPE & OPTION CONSTANTS)
 # -------------------------------------------------------------------------
 # These define the allowed scopes and variable options used throughout the
-# module. They are read‑only to prevent accidental mutation.
+# module. They are read-only to prevent accidental mutation.
 # -------------------------------------------------------------------------
 
 $MyVars = @{
@@ -530,7 +542,7 @@ Publish-Variables -Variables $MyVars
 # MODULE METADATA AND ENVIRONMENT INFORMATION
 # -------------------------------------------------------------------------
 # These values describe the module version, PowerShell version, culture,
-# environment, and runtime context. They are read‑only except where noted.
+# environment, and runtime context. They are read-only except where noted.
 # -------------------------------------------------------------------------
 
 $ML = @{
@@ -760,16 +772,16 @@ Publish-Variables -Variables $MyVars
 # =============================================================================
 # These maps define the numeric codes used throughout DNS and DNSSEC. They are
 # used by:
-#   • ConvertTo‑DnsTypeCode / ConvertFrom‑DnsTypeCode
-#   • ConvertTo‑DnsClassCode / ConvertFrom‑DnsClassCode
-#   • DNSSEC canonicalization and signature validation
-#   • RRSIG TypeCovered logic
-#   • Packet parsing and construction
+#   - ConvertTo-DnsTypeCode / ConvertFrom-DnsTypeCode
+#   - ConvertTo-DnsClassCode / ConvertFrom-DnsClassCode
+#   - DNSSEC canonicalization and signature validation
+#   - RRSIG TypeCovered logic
+#   - Packet parsing and construction
 #
 # Deprecated RR types remain present for:
-#   • RRSIG TypeCovered correctness
-#   • Historical packet parsing
-#   • Forensic analysis
+#   - RRSIG TypeCovered correctness
+#   - Historical packet parsing
+#   - Forensic analysis
 #
 # Ordering is intentional and preserved.
 # =============================================================================
@@ -785,14 +797,14 @@ $MyVars = @{
 		N07DNS = @{
 
 		# -------------------------------------------------------------------------
-		# QTYPE MAP - DNS RR TYPE ↔ CODE
+		# QTYPE MAP - DNS RR TYPE <-> CODE
 		# -------------------------------------------------------------------------
 		# This is the authoritative mapping of DNS record types to numeric codes.
 		# Used by:
-		#   • ConvertTo-DnsTypeCode
-		#   • ConvertFrom-DnsTypeCode
-		#   • Packet parsing
-		#   • RRSIG TypeCovered logic
+		#   - ConvertTo-DnsTypeCode
+		#   - ConvertFrom-DnsTypeCode
+		#   - Packet parsing
+		#   - RRSIG TypeCovered logic
 		#
 		# Deprecation notes and replacements included inline.
 		# -------------------------------------------------------------------------
@@ -857,12 +869,12 @@ $MyVars = @{
 
 
 		# -------------------------------------------------------------------------
-		# DNS CLASS MAP - CLASS ↔ CODE
+		# DNS CLASS MAP - CLASS <-> CODE
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • ConvertTo-DnsClassCode
-		#   • ConvertFrom-DnsClassCode
-		#   • Packet parsing
+		#   - ConvertTo-DnsClassCode
+		#   - ConvertFrom-DnsClassCode
+		#   - Packet parsing
 		# -------------------------------------------------------------------------
 
 		DnsClassMap = @{
@@ -880,13 +892,13 @@ $MyVars = @{
 
 
 		# -------------------------------------------------------------------------
-		# DNSSEC ALGORITHM MAP - ALGORITHM ↔ CODE
+		# DNSSEC ALGORITHM MAP - ALGORITHM <-> CODE
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • Test-DnssecSignature
-		#   • Test-DnssecRrsig
-		#   • ConvertTo-DnssecAlgorithmCode
-		#   • ConvertFrom-DnssecAlgorithmCode
+		#   - Test-DnssecSignature
+		#   - Test-DnssecRrsig
+		#   - ConvertTo-DnssecAlgorithmCode
+		#   - ConvertFrom-DnssecAlgorithmCode
 		#
 		# Deprecated algorithms remain for historical validation.
 		# -------------------------------------------------------------------------
@@ -897,7 +909,7 @@ $MyVars = @{
 					DH                 = 2     # Deprecated.
 					DSA                = 3     # Deprecated.
 					ECC                = 4     # Legacy.
-					RSASHA1            = 5     # Deprecated - SHA‑1 collision risk.
+					RSASHA1            = 5     # Deprecated - SHA-1 collision risk.
 					DSA_NSEC3_SHA1     = 6     # Deprecated.
 					RSASHA1_NSEC3_SHA1 = 7     # Deprecated.
 					RSASHA256          = 8     # Common.
@@ -920,13 +932,13 @@ $MyVars = @{
 		# DNSSEC DIGEST MAP - DS DIGEST ALGORITHMS
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • Test-DnssecDsForDnskey
-		#   • DS record validation
+		#   - Test-DnssecDsForDnskey
+		#   - DS record validation
 		# -------------------------------------------------------------------------
 
 		DnssecDigestMap = @{
 			Value = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ([ordered]@{
-					SHA1   = 1   # Deprecated - SHA‑1 collision risk.
+					SHA1   = 1   # Deprecated - SHA-1 collision risk.
 					SHA256 = 2   # Recommended.
 					GOST   = 3   # Rare.
 					SHA384 = 4   # Recommended.
@@ -939,8 +951,8 @@ $MyVars = @{
 		# RCODE MAP - DNS RESPONSE CODES
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • ConvertFrom-DnsHeader
-		#   • Error handling
+		#   - ConvertFrom-DnsHeader
+		#   - Error handling
 		# -------------------------------------------------------------------------
 
 		RcodeMap = @{
@@ -971,11 +983,11 @@ $MyVars = @{
 
 
 		# -------------------------------------------------------------------------
-		# TYPE COVERED MAP - RRSIG TYPE‑COVERED FIELD
+		# TYPE COVERED MAP - RRSIG TYPE-COVERED FIELD
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • Test-DnssecRrsig
-		#   • Canonical RRset validation
+		#   - Test-DnssecRrsig
+		#   - Canonical RRset validation
 		#
 		# Deprecated types remain for historical RRSIG validation.
 		# -------------------------------------------------------------------------
@@ -1031,8 +1043,8 @@ $MyVars = @{
 		# EDNS OPTION MAP - EDNS0 OPTION CODES
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • OPT pseudo‑record parsing
-		#   • EDNS client subnet, padding, cookies, etc.
+		#   - OPT pseudo-record parsing
+		#   - EDNS client subnet, padding, cookies, etc.
 		# -------------------------------------------------------------------------
 
 		EdnsOptionMap = @{
@@ -1065,8 +1077,8 @@ $MyVars = @{
 		# DNS HEADER FLAGS MAP - BITMASKS
 		# -------------------------------------------------------------------------
 		# Used by:
-		#   • ConvertFrom-DnsHeader
-		#   • Response interpretation
+		#   - ConvertFrom-DnsHeader
+		#   - Response interpretation
 		# -------------------------------------------------------------------------
 
 		DnsHeaderFlagsMap = @{
@@ -1198,7 +1210,7 @@ $MyVars = @{
 
 		SshfpFingerprintTypeMap = @{
 			Value = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ([ordered]@{
-					SHA1   = 1   # Deprecated - SHA‑1 collision risk.
+					SHA1   = 1   # Deprecated - SHA-1 collision risk.
 					SHA256 = 2   # Recommended.
 			})
 			Scope  = $VSScript
@@ -1211,21 +1223,21 @@ Publish-Variables -Variables $MyVars
 # =============================================================================
 # FINAL INITIALIZATION BLOCK
 # =============================================================================
-# This block performs the final module‑level initialization steps:
+# This block performs the final module-level initialization steps:
 #
-#   • Load root server hints
-#   • Initialize DNSSEC trust anchors
-#   • Publish all variable groups
-#   • Mark the module as fully initialized
+#   - Load root server hints
+#   - Initialize DNSSEC trust anchors
+#   - Publish all variable groups
+#   - Mark the module as fully initialized
 #
 # These steps must occur *after* all maps, variables, and helper functions
 # have been defined, because DNSSEC validation depends on:
-#   • QtypeMap
-#   • DnsClassMap
-#   • DnssecAlgorithmMap
-#   • DnssecDigestMap
-#   • TypeCoveredMap
-#   • NSEC/NSEC3 maps
+#   - QtypeMap
+#   - DnsClassMap
+#   - DnssecAlgorithmMap
+#   - DnssecDigestMap
+#   - TypeCoveredMap
+#   - NSEC/NSEC3 maps
 #
 # Ordering is intentional and preserved.
 # =============================================================================
@@ -1239,8 +1251,8 @@ $MyVars = @{
 		#   Helpers\Get-RootHints.ps1
 		#
 		# They are used by:
-		#   • Resolve-DnsIterative
-		#   • Resolve-Dnssec
+		#   - Resolve-DnsIterative
+		#   - Resolve-Dnssec
 		#
 		# Users may override root hints by modifying RootServerAddresses.Value.
 		# -------------------------------------------------------------------------
@@ -1256,17 +1268,17 @@ $MyVars = @{
 		#   Initialize-DnssecTrustAnchors.ps1
 		#
 		# They are used by:
-		#   • Resolve-Dnssec
-		#   • Resolve-DnssecChain
-		#   • Test-DnssecAnchoredDnskey
-		#   • Test-DnssecValidation
+		#   - Resolve-Dnssec
+		#   - Resolve-DnssecChain
+		#   - Test-DnssecAnchoredDnskey
+		#   - Test-DnssecValidation
 		#
 		# Users may override trust anchors via:
-		#   • Add-DnssecTrustAnchor
-		#   • Import-DnssecTrustAnchors
-		#   • Update-DnssecTrustAnchors
+		#   - Add-DnssecTrustAnchor
+		#   - Import-DnssecTrustAnchors
+		#   - Update-DnssecTrustAnchors
 		#
-		# Trust anchors are stored in script‑scope variables for deterministic behavior.
+		# Trust anchors are stored in script-scope variables for deterministic behavior.
 		# -------------------------------------------------------------------------
 
 		TrustAnchorsInitialized = @{
@@ -1283,15 +1295,15 @@ Publish-Variables -Variables $MyVars
 # MODULE READY FLAG
 # -------------------------------------------------------------------------
 # Indicates that:
-#   • All maps are loaded
-#   • All variables are published
-#   • Root hints are available
-#   • Trust anchors are initialized
+#   - All maps are loaded
+#   - All variables are published
+#   - Root hints are available
+#   - Trust anchors are initialized
 #
 # This flag is used by:
-#   • Resolve-Dnssec
-#   • Test-DnssecValidation
-#   • Any function requiring DNSSEC readiness
+#   - Resolve-Dnssec
+#   - Test-DnssecValidation
+#   - Any function requiring DNSSEC readiness
 # -------------------------------------------------------------------------
 
 $script:ModuleInitialized = $true

@@ -1,5 +1,17 @@
 # DnsTools Changelog
 
+## v0.6
+
+### Changes
+- Added explicit `FunctionsToExport` to the manifest so the module autoloads on first command use (no manual `Import-Module`).
+- Added a 30-second timeout to the IANA trust-anchor and root-hints web requests (`Update-DnssecTrustAnchors`, `Get-RootHintsObject`) so a hung download cannot block import/refresh indefinitely.
+- Declared `PowerShellVersion = '5.0'` in the manifest to match the module's `#requires`.
+
+### Fixed
+- `Invoke-RootHintsBaselineOffer` (an internal module-init helper, auto-invoked at import) is no longer exported as a public command; it is marked internal in the export table so it cannot be re-triggered by hand.
+- Reconciled the manifest `FunctionsToExport` with the runtime export table (`Update-DnsRootHints` and `Invoke-RootHintsBaselineOffer` now have explicit table entries).
+- Fixed the placeholder `ProjectUri` (now points at the real repository) and stray trailing whitespace in the `Tags` array.
+
 ## v0.5.2
 
 ### New Record Types

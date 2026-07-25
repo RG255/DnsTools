@@ -14,6 +14,7 @@
 	CompanyName   = 'Ray Labs'
 	Copyright     = '(c) 2026 Ray. All rights reserved.'
 	Description   = 'A full DNS, DNSSEC, DoT, DoH, and iterative resolver toolkit for PowerShell.'
+	PowerShellVersion = '5.0'
 	# Explicit exports so PowerShell AUTO-LOADS this module on first use of any command
 	# (no manual Import-Module). These are all cross-platform (no FunctionsWindows), so
 	# the list is the full set on every OS. Keep in sync with the runtime export set.
@@ -21,7 +22,7 @@
 		'Add-DnssecTrustAnchor', 'ConvertFrom-DnsClassCode', 'ConvertFrom-DnsPacket', 'ConvertFrom-DnssecAlgorithmCode',
 		'ConvertFrom-DnsTypeCode', 'ConvertTo-DnsClassCode', 'ConvertTo-DnssecAlgorithmCode', 'ConvertTo-DnsTypeCode',
 		'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName', 'Get-DnssecTrustAnchors',
-		'Import-DnssecTrustAnchors', 'Invoke-DnsUdpQuery', 'Invoke-RootHintsBaselineOffer', 'New-DnsQueryPacket',
+		'Import-DnssecTrustAnchors', 'Invoke-DnsUdpQuery', 'New-DnsQueryPacket',
 		'Resolve-DnsIterative', 'Resolve-Dnssec', 'Resolve-DnssecChain', 'Resolve-DnssecName',
 		'Test-DnssecName', 'Test-DnssecValidation', 'Update-DnsRootHints', 'Update-DnssecTrustAnchors'
 	)
@@ -34,11 +35,11 @@
 	PrivateData   = @{
 		PSData     = @{
 			Tags       = @(
-				'DNS', 'DNSSEC', 'DoT', 'DoH', 
+				'DNS', 'DNSSEC', 'DoT', 'DoH',
 				'Resolver', 'Networking', 'Security'
 			)
 			LicenseUri = 'https://opensource.org/licenses/MIT'
-			ProjectUri = 'https://github.com/yourrepo'
+			ProjectUri = 'https://github.com/RG255/DnsTools'
 		}
 		ModuleName = 'DnsTools'
 		ModuleVars = @{
