@@ -1,5 +1,7 @@
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "NSEC3 NODATA Proof" {
 
     BeforeAll {
@@ -71,4 +73,5 @@ Describe "NSEC3 NODATA Proof" {
         $result.Nodata | Should -BeFalse
         $result.Reason | Should -Be "Requested type exists"
     }
+}
 }

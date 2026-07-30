@@ -1,5 +1,7 @@
 using module dnstools
 
+InModuleScope DnsTools {
+
 
 Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 	#
@@ -108,4 +110,5 @@ Describe -Name 'NSEC3 Closest Encloser' -Fixture {
 
 		$result | Should -Be $null
 	}
+}
 }

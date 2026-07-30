@@ -3,6 +3,8 @@
 
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "DNSSEC Chain Validation" {
 
     BeforeAll {
@@ -236,4 +238,5 @@ Describe "DNSSEC Chain Validation" {
             $result.Reason | Should -Match "No matching DNSKEY for RRSIG"
         }
     }
+}
 }

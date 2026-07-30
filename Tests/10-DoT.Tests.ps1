@@ -3,6 +3,8 @@
 
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "DnsDotClient - DNS-over-TLS Transport" {
 
     It "Loads dot-simple-response.bin fixture" {
@@ -34,7 +36,9 @@ Describe "DnsDotClient - DNS-over-TLS Transport" {
             }
 
             [DnsPacket] Query([DnsPacket]$packet) {
-                return ConvertFrom-DnsWireBytes -Bytes $this.ResponseBytes
+                # Mirror the real DnsDotClient: parse via the static class method (a class method cannot see the
+                # module-internal ConvertFrom-DnsWireBytes function; [DnsPacket]::Parse is what the real client uses).
+                return [DnsPacket]::Parse($this.ResponseBytes)
             }
         }
 
@@ -79,4 +83,5 @@ Describe "DnsDotClient - DNS-over-TLS Transport" {
             $pkt.Answers[4].RDataObject.Address | Should -Be "203.0.113.5"
         }
     }
+}
 }

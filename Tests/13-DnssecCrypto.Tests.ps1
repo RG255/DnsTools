@@ -3,6 +3,7 @@
 
 using module dnstools
 
+InModuleScope DnsTools {
 Describe "DNSSEC Cryptographic Functions" {
 
     #
@@ -159,4 +160,5 @@ Describe "DNSSEC Cryptographic Functions" {
             Test-DnssecTimeWindow -Rrsig $rrsig | Should -BeFalse
         }
     }
+}
 }

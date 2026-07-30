@@ -3,6 +3,8 @@
 
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "Transport Helper Functions" {
 
     Context "ConvertTo-DnsWireBytes" {
@@ -86,4 +88,5 @@ Describe "Transport Helper Functions" {
             { & $script } | Should -Throw
         }
     }
+}
 }

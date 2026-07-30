@@ -1,5 +1,7 @@
 using module DnsTools
 
+InModuleScope DnsTools {
+
 Describe 'Bootstrap Resolver' {
 
     It 'Resolves NS names using glue' {
@@ -27,4 +29,5 @@ Describe 'Bootstrap Resolver' {
         $ips = Resolve-NameserverAddress -NsName 'ns1.deep.example' -BootstrapServers @('192.0.2.1') -UseGlueOnly
         $ips | Should -Contain '192.0.2.53'
     }
+}
 }

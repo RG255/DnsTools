@@ -3,6 +3,8 @@
 
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "DNSSEC Canonicalization Functions" {
 
     Context "Canonical Name Wire" {
@@ -119,4 +121,5 @@ Describe "DNSSEC Canonicalization Functions" {
             $sd | Should -Be $fixture
         }
     }
+}
 }

@@ -3,6 +3,8 @@
 
 using module dnstools
 
+InModuleScope DnsTools {
+
 #Import-Module ('{0}/../DnsSecTools.psd1' -f $PSScriptRoot) -Force
 
 Describe 'NSEC3 Opt-Out Behaviour' {
@@ -69,4 +71,5 @@ Describe 'NSEC3 Opt-Out Behaviour' {
 
         $result | Should -Be $false
     }
+}
 }

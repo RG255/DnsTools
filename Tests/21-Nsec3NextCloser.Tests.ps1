@@ -1,5 +1,7 @@
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "NSEC3 Next Closer" {
 
     BeforeAll {
@@ -75,4 +77,5 @@ Describe "NSEC3 Next Closer" {
 
         $result | Should -BeNullOrEmpty
     }
+}
 }

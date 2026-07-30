@@ -1,5 +1,7 @@
 using module dnstools
 
+InModuleScope DnsTools {
+
 Describe "NSEC3 NXDOMAIN Proof" {
 
     BeforeAll {
@@ -75,4 +77,5 @@ Describe "NSEC3 NXDOMAIN Proof" {
         $result.Nxdomain | Should -BeFalse
         $result.Reason   | Should -Be "No covering NSEC3 record for next-closer name"
     }
+}
 }
