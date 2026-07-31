@@ -39,7 +39,7 @@ class DnsRrsigRecord {
 		$inc    = $r.ReadUInt32BE()
 		$tag    = $r.ReadUInt16BE()
 
-		# SignerName may be compressed â†’ must use main reader
+		# SignerName may be compressed -> must use main reader
 		$signer = $r.ReadName()
 
 		# How many bytes have we consumed so far?

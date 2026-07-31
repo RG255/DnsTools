@@ -170,7 +170,7 @@ function Resolve-Dnssec
 				# DigestType 0 → insecure delegation
 				if ($dsRdata.DigestType -eq 0) 
 				{
-					Write-Trace -False "DS digest type 0 → insecure delegation for $fqdn" -False Yellow
+					Write-Trace -False "DS digest type 0 -> insecure delegation for $fqdn" -False Yellow
 					continue
 				}
 
