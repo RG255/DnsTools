@@ -1,4 +1,4 @@
-class DnsNsec3Record {
+﻿class DnsNsec3Record {
 	[byte]  $HashAlgorithm
 	[byte]  $Flags
 	[uint16]$Iterations

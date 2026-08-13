@@ -1,4 +1,4 @@
-function Test-DnssecNsec3Nxdomain
+﻿function Test-DnssecNsec3Nxdomain
 {
 	<#
 	.SYNOPSIS

@@ -1,4 +1,4 @@
-class DnsUriRecord {
+﻿class DnsUriRecord {
 	[uint16]$Priority
 	[uint16]$Weight
 	[string]$Target

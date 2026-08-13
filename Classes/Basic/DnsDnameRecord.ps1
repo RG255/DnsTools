@@ -1,4 +1,4 @@
-class DnsDnameRecord {
+﻿class DnsDnameRecord {
 	[string]$Target
 
 	DnsDnameRecord([string]$target)

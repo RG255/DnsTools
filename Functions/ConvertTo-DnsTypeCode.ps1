@@ -1,4 +1,4 @@
-function ConvertTo-DnsTypeCode
+﻿function ConvertTo-DnsTypeCode
 {
 	<#
 	.SYNOPSIS

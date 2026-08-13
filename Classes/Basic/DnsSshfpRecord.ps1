@@ -1,4 +1,4 @@
-class DnsSshfpRecord {
+﻿class DnsSshfpRecord {
 	[byte]$Algorithm          # 1=RSA, 2=DSS, 3=ECDSA, 4=Ed25519
 	[byte]$FingerprintType    # 1=SHA-1, 2=SHA-256
 	[byte[]]$Fingerprint      # Public key fingerprint

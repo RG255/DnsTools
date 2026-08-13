@@ -1,4 +1,4 @@
-function Add-DnssecTrustAnchor
+﻿function Add-DnssecTrustAnchor
 {
 	<#
 	.SYNOPSIS

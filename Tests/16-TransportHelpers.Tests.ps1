@@ -1,4 +1,4 @@
-# Tests/16-TransportHelpers.Tests.ps1
+﻿# Tests/16-TransportHelpers.Tests.ps1
 # Transport Helper Function Tests
 
 using module dnstools

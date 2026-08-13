@@ -1,4 +1,4 @@
-class DnsRpRecord {
+﻿class DnsRpRecord {
 	[string]$MailBox      # Responsible person's mailbox encoded as a domain name (e.g. admin.example.com = admin@example.com)
 	[string]$TxtDomain    # Domain name whose TXT records hold further contact information
 

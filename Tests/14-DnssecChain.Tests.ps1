@@ -1,4 +1,4 @@
-# Tests/14-DnssecChain.Tests.ps1
+﻿# Tests/14-DnssecChain.Tests.ps1
 # DNSSEC Chain Validation Tests
 
 using module dnstools

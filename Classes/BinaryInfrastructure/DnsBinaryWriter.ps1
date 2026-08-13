@@ -1,4 +1,4 @@
-class DnsBinaryWriter {
+﻿class DnsBinaryWriter {
 	[System.Collections.Generic.List[byte]] $Buffer
 
 	DnsBinaryWriter() 

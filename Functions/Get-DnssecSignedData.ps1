@@ -1,4 +1,4 @@
-function Get-DnssecSignedData
+﻿function Get-DnssecSignedData
 {
 	<#
 	.SYNOPSIS

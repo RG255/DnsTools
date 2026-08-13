@@ -1,4 +1,4 @@
-function Import-DnssecTrustAnchors
+﻿function Import-DnssecTrustAnchors
 {
 	<#
 	.SYNOPSIS

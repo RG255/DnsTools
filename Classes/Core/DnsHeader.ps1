@@ -1,4 +1,4 @@
-class DnsHeader {
+﻿class DnsHeader {
 	[uint16]$Id
 	[uint16]$Flags
 	[uint16]$QdCount

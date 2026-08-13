@@ -1,4 +1,4 @@
-class DnsMxRecord {
+﻿class DnsMxRecord {
 	[uint16]$Preference
 	[string]$Exchange
 

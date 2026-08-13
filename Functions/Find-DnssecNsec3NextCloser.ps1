@@ -1,4 +1,4 @@
-function Find-DnssecNsec3NextCloser
+﻿function Find-DnssecNsec3NextCloser
 {
 	<#
 	.SYNOPSIS

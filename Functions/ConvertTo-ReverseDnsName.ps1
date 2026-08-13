@@ -1,4 +1,4 @@
-function ConvertTo-ReverseDnsName {
+﻿function ConvertTo-ReverseDnsName {
     <#
     .SYNOPSIS
         Converts an IP address to its reverse DNS name format.

@@ -1,4 +1,4 @@
-function Get-DnssecCanonicalNameWire
+﻿function Get-DnssecCanonicalNameWire
 {
 	<#
 	.SYNOPSIS

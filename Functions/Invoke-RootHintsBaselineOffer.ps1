@@ -1,4 +1,4 @@
-function Invoke-RootHintsBaselineOffer
+﻿function Invoke-RootHintsBaselineOffer
 {
 	<#
 		.SYNOPSIS

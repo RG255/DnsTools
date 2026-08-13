@@ -1,4 +1,4 @@
-function Resolve-DnssecChain
+﻿function Resolve-DnssecChain
 {
 	<#
 	.SYNOPSIS

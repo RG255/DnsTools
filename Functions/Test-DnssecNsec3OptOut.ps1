@@ -1,4 +1,4 @@
-function Test-DnssecNsec3OptOut
+﻿function Test-DnssecNsec3OptOut
 {
 	<#
 	.SYNOPSIS

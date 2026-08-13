@@ -1,4 +1,4 @@
-# Tests/13-DnssecCrypto.Tests.ps1
+﻿# Tests/13-DnssecCrypto.Tests.ps1
 # DNSSEC Cryptographic Operations Tests
 
 using module dnstools

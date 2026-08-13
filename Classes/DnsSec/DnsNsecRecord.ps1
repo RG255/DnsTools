@@ -1,4 +1,4 @@
-class DnsNsecRecord {
+﻿class DnsNsecRecord {
 	[string] $NextDomainName
 	[int[]]  $Types
 

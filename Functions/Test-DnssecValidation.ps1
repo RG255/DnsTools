@@ -1,4 +1,4 @@
-function Test-DnssecValidation
+﻿function Test-DnssecValidation
 {
 	<#
 	.SYNOPSIS

@@ -1,4 +1,4 @@
-function Get-DnssecCanonicalRrWire
+﻿function Get-DnssecCanonicalRrWire
 {
 	<#
 	.SYNOPSIS

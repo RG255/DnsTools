@@ -1,4 +1,4 @@
-function Invoke-DnsUdpQuery
+﻿function Invoke-DnsUdpQuery
 {
 	<#
 	.SYNOPSIS

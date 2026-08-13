@@ -1,4 +1,4 @@
-class DnsIpsecKeyRecord {
+﻿class DnsIpsecKeyRecord {
 	[byte]  $Precedence    # Like MX preference - lower is preferred
 	[byte]  $GatewayType   # 0=none, 1=IPv4, 2=IPv6, 3=domain name
 	[byte]  $Algorithm     # 0=none, 1=DSA, 2=RSA, 3=ECDSA

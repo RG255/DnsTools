@@ -1,4 +1,4 @@
-class DnsDsRecord {
+﻿class DnsDsRecord {
 	[uint16]$KeyTag
 	[byte]  $Algorithm
 	[byte]  $DigestType

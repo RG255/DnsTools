@@ -1,4 +1,4 @@
-# Test Set 18 - NSEC3 Record Parsing & Wire Encoding
+﻿# Test Set 18 - NSEC3 Record Parsing & Wire Encoding
 # Run with: Invoke-Pester
 
 using module dnstools

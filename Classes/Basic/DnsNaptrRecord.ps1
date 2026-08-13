@@ -1,4 +1,4 @@
-class DnsNaptrRecord {
+﻿class DnsNaptrRecord {
 	[uint16]$Order            # Order of processing
 	[uint16]$Preference       # Preference within same order
 	[string]$Flags            # Flags (e.g., "S", "A", "U", "P")

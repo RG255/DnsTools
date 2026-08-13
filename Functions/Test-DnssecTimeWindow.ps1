@@ -1,4 +1,4 @@
-function Test-DnssecTimeWindow
+﻿function Test-DnssecTimeWindow
 {
 	<#
 	.SYNOPSIS

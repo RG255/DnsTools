@@ -1,4 +1,4 @@
-class DnsOptRecord {
+﻿class DnsOptRecord {
 	[uint16]$UdpPayloadSize
 	[byte]  $ExtendedRcode
 	[byte]  $Version

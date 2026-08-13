@@ -1,4 +1,4 @@
-function Resolve-Dnssec
+﻿function Resolve-Dnssec
 {
 	<#
 	.SYNOPSIS

@@ -1,4 +1,4 @@
-# Pre-deploy hook for DnsTools (runs client-side, non-elevated, BEFORE Deploy-Modules copies the tree).
+﻿# Pre-deploy hook for DnsTools (runs client-side, non-elevated, BEFORE Deploy-Modules copies the tree).
 #
 # Refreshes the shipped root-hints baseline (Helpers\RootHints-Cache.xml) from a live, TLS-verified fetch of
 # named.root, so the freshly deployed module carries a current root list. The baseline is the TRUSTED offline

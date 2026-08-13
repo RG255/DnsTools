@@ -1,4 +1,4 @@
-function Get-RecordTypeAAAA
+﻿function Get-RecordTypeAAAA
 {
 	<#
 	.SYNOPSIS

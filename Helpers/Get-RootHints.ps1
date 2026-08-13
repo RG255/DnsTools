@@ -1,4 +1,4 @@
-function Get-RootHintsObject
+﻿function Get-RootHintsObject
 {
 	# URI to obtain the authoritative root hints file (TLS-authenticated).
 	$URI_RH = 'https://www.internic.net/domain/named.root'

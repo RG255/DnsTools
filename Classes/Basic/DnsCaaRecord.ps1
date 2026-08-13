@@ -1,4 +1,4 @@
-class DnsCaaRecord {
+﻿class DnsCaaRecord {
 	[byte]$Flags        # Flags byte (bit 0 = critical flag)
 	[string]$Tag        # Property tag (e.g., "issue", "issuewild", "iodef")
 	[string]$Value      # Property value

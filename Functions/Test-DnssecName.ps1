@@ -1,4 +1,4 @@
-function Test-DnssecName
+﻿function Test-DnssecName
 {
 	<#
 	.SYNOPSIS

@@ -1,4 +1,4 @@
-function Test-DnssecNsec3Nodata
+﻿function Test-DnssecNsec3Nodata
 {
 	<#
 	.SYNOPSIS

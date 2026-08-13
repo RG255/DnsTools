@@ -1,4 +1,4 @@
-function Test-DnssecSignature
+﻿function Test-DnssecSignature
 {
 	<#
 	.SYNOPSIS

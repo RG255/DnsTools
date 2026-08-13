@@ -1,4 +1,4 @@
-function Get-DnssecTrustAnchors
+﻿function Get-DnssecTrustAnchors
 {
 	<#
 	.SYNOPSIS

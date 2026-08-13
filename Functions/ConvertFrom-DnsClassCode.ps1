@@ -1,4 +1,4 @@
-function ConvertFrom-DnsClassCode
+﻿function ConvertFrom-DnsClassCode
 {
 	<#
 	.SYNOPSIS

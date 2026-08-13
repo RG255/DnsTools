@@ -1,4 +1,4 @@
-using module dnstools
+﻿using module dnstools
 
 Describe "Canonical Wire Format" {
 

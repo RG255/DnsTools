@@ -1,4 +1,4 @@
-function Update-DnssecTrustAnchors
+﻿function Update-DnssecTrustAnchors
 {
     <#
     .SYNOPSIS

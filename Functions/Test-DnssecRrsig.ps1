@@ -1,4 +1,4 @@
-function Test-DnssecRrsig
+﻿function Test-DnssecRrsig
 {
 	<#
 	.SYNOPSIS

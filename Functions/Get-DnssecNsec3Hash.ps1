@@ -1,4 +1,4 @@
-function Get-DnssecNsec3Hash
+﻿function Get-DnssecNsec3Hash
 {
 	<#
 	.SYNOPSIS

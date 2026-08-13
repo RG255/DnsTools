@@ -1,4 +1,4 @@
-function ConvertFrom-DnssecAlgorithmCode
+﻿function ConvertFrom-DnssecAlgorithmCode
 {
 	<#
 	.SYNOPSIS

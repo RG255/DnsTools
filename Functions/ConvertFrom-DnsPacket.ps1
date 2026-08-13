@@ -1,4 +1,4 @@
-function ConvertFrom-DnsPacket
+﻿function ConvertFrom-DnsPacket
 {
 	<#
 	.SYNOPSIS

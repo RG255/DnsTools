@@ -1,4 +1,4 @@
-function Get-DnssecKeyDigest
+﻿function Get-DnssecKeyDigest
 {
 	<#
 	.SYNOPSIS

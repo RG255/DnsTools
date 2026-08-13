@@ -1,4 +1,4 @@
-function Update-DnsRootHints
+﻿function Update-DnsRootHints
 {
 	<#
 		.SYNOPSIS

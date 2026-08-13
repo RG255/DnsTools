@@ -1,4 +1,4 @@
-class DnsDnskeyRecord {
+﻿class DnsDnskeyRecord {
 	[uint16]$Flags
 	[byte]  $Protocol
 	[byte]  $Algorithm

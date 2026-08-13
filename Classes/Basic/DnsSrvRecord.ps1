@@ -1,4 +1,4 @@
-class DnsSrvRecord {
+﻿class DnsSrvRecord {
 	[uint16]$Priority
 	[uint16]$Weight
 	[uint16]$Port

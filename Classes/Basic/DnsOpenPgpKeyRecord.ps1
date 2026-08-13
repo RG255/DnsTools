@@ -1,4 +1,4 @@
-class DnsOpenPgpKeyRecord {
+﻿class DnsOpenPgpKeyRecord {
 	[byte[]]$PublicKey     # OpenPGP transferable public key (raw bytes; base64 in presentation)
 
 	DnsOpenPgpKeyRecord([byte[]]$key)

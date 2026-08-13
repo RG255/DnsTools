@@ -1,4 +1,4 @@
-# Run-GenerateFixtures.ps1
+﻿# Run-GenerateFixtures.ps1
 # Wrapper script that sets up the environment for fixture generation
 
 param(

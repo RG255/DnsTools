@@ -1,4 +1,4 @@
-function Test-DnssecChain
+﻿function Test-DnssecChain
 {
 	<#
 	.SYNOPSIS

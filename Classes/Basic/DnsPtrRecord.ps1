@@ -1,4 +1,4 @@
-class DnsPtrRecord {
+﻿class DnsPtrRecord {
     [string]$Pointer
 
     DnsPtrRecord([string]$pointer) {

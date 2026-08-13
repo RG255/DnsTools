@@ -1,4 +1,4 @@
-function New-DnsQueryPacket
+﻿function New-DnsQueryPacket
 {
 	<#
 	.SYNOPSIS

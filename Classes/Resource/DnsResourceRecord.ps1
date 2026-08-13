@@ -1,4 +1,4 @@
-class DnsResourceRecord {
+﻿class DnsResourceRecord {
 	[string] $Name
 	[uint16] $Type
 	[uint16] $Class

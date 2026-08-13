@@ -1,4 +1,4 @@
-function Format-DnssecResult
+﻿function Format-DnssecResult
 {
 	<#
 	.SYNOPSIS

@@ -1,4 +1,4 @@
-function Format-DnsIterativeResult
+﻿function Format-DnsIterativeResult
 {
     <#
     .SYNOPSIS

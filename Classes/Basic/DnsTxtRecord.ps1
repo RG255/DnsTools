@@ -1,4 +1,4 @@
-class DnsTxtRecord {
+﻿class DnsTxtRecord {
 	[string[]]$Strings
 
 	DnsTxtRecord([string[]]$strings) 

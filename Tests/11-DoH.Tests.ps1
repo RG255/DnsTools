@@ -1,4 +1,4 @@
-# Tests/11-DoH.Tests.ps1
+﻿# Tests/11-DoH.Tests.ps1
 # DNS-over-HTTPS (DoH) Transport Tests
 
 using module dnstools

@@ -1,4 +1,4 @@
-function Get-DnssecSigningKey
+﻿function Get-DnssecSigningKey
 {
 	<#
 	.SYNOPSIS

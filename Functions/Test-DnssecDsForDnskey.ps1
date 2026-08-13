@@ -1,4 +1,4 @@
-function Test-DnssecDsForDnskey
+﻿function Test-DnssecDsForDnskey
 {
 	<#
 	.SYNOPSIS

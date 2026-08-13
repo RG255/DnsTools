@@ -1,4 +1,4 @@
-# GenPsm1File.ps1 - Generates DnsTools.psm1 from class files and tail script
+﻿# GenPsm1File.ps1 - Generates DnsTools.psm1 from class files and tail script
 # Location: Helpers folder
 # NOTE: If this file or DnsTools-psm1-Tail.ps1 is edited, run this script and deploy changes
 

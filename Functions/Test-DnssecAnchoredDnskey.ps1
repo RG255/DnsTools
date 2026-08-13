@@ -1,4 +1,4 @@
-function Test-DnssecAnchoredDnskey
+﻿function Test-DnssecAnchoredDnskey
 {
 	<#
 	.SYNOPSIS

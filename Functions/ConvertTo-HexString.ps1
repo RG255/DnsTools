@@ -1,4 +1,4 @@
-function ConvertTo-HexString
+﻿function ConvertTo-HexString
 {
 	<#
 	.SYNOPSIS

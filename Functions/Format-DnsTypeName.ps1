@@ -1,4 +1,4 @@
-function Format-DnsTypeName
+﻿function Format-DnsTypeName
 {
 	<#
 	.SYNOPSIS

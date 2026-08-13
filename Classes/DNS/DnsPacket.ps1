@@ -1,4 +1,4 @@
-class DnsPacket {
+﻿class DnsPacket {
 	[DnsHeader] $Header
 	[System.Collections.Generic.List[DnsQuestion]] $Questions
 	[System.Collections.Generic.List[DnsResourceRecord]] $Answers

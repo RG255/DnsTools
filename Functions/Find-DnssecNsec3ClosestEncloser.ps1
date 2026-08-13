@@ -1,4 +1,4 @@
-function Find-DnssecNsec3ClosestEncloser
+﻿function Find-DnssecNsec3ClosestEncloser
 {
 	<#
 	.SYNOPSIS

@@ -1,4 +1,4 @@
-class DnsRrsigRecord {
+﻿class DnsRrsigRecord {
 	[uint16]$TypeCovered
 	[byte]  $Algorithm
 	[byte]  $Labels

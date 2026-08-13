@@ -1,4 +1,4 @@
-class DnsNsRecord {
+﻿class DnsNsRecord {
 	[string]$NsName
 
 	DnsNsRecord([string]$name) 

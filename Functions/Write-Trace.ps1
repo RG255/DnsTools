@@ -1,4 +1,4 @@
-function Write-Trace
+﻿function Write-Trace
 {
 	<#
 	.SYNOPSIS

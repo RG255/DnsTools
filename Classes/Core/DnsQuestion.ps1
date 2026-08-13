@@ -1,4 +1,4 @@
-class DnsQuestion {
+﻿class DnsQuestion {
 	[string]$Name
 	[uint16]$Type
 	[uint16]$Class

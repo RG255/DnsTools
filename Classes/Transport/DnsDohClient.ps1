@@ -1,4 +1,4 @@
-class DnsDohClient {
+﻿class DnsDohClient {
 	[string] $Endpoint
 
 	DnsDohClient([string]$endpoint) 

@@ -1,4 +1,4 @@
-function ConvertFrom-DnsQuestion
+﻿function ConvertFrom-DnsQuestion
 {
 	<#
 	.SYNOPSIS

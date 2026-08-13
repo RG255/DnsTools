@@ -1,4 +1,4 @@
-class DnsTlsaRecord {
+﻿class DnsTlsaRecord {
 	[byte]$CertUsage           # 0-3: PKIX-TA, PKIX-EE, DANE-TA, DANE-EE
 	[byte]$Selector            # 0=Full cert, 1=SubjectPublicKeyInfo
 	[byte]$MatchingType        # 0=Full, 1=SHA-256, 2=SHA-512

@@ -1,4 +1,4 @@
-function ConvertFrom-DnsHeader
+﻿function ConvertFrom-DnsHeader
 {
 	<#
 	.SYNOPSIS

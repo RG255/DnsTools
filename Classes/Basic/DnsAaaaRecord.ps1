@@ -1,4 +1,4 @@
-class DnsAaaaRecord {
+﻿class DnsAaaaRecord {
 	[string]$Address
 	static [DnsAaaaRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{

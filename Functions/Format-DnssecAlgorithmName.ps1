@@ -1,4 +1,4 @@
-function Format-DnssecAlgorithmName
+﻿function Format-DnssecAlgorithmName
 {
 	<#
 	.SYNOPSIS

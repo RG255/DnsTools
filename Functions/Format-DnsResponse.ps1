@@ -1,4 +1,4 @@
-function Format-DnsResponse
+﻿function Format-DnsResponse
 {
 	<#
 	.SYNOPSIS

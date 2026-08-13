@@ -1,4 +1,4 @@
-class DnsDotClient {
+﻿class DnsDotClient {
 	[string] $Server
 	[int]    $Port
 

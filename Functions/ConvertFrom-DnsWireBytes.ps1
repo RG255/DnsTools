@@ -1,4 +1,4 @@
-function ConvertFrom-DnsWireBytes
+﻿function ConvertFrom-DnsWireBytes
 {
 	<#
 	.SYNOPSIS

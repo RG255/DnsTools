@@ -1,4 +1,4 @@
-using module dnstools
+﻿using module dnstools
 
 Describe "CAA Record Parsing and Encoding" {
 	It "Parses a CAA record" {

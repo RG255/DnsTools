@@ -1,4 +1,4 @@
-class DnsSoaRecord {
+﻿class DnsSoaRecord {
 	[string]$MName      # Primary nameserver
 	[string]$RName      # Responsible person email (@ replaced with .)
 	[uint32]$Serial     # Zone serial number

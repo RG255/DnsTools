@@ -1,4 +1,4 @@
-class DnsBinaryReader {
+﻿class DnsBinaryReader {
 	[byte[]] $Buffer
 	[int]    $Position
 

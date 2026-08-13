@@ -1,4 +1,4 @@
-# Test Set 19 - NSEC3 Opt-Out Logic
+﻿# Test Set 19 - NSEC3 Opt-Out Logic
 # Run with: Invoke-Pester
 
 using module dnstools

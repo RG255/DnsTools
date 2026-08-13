@@ -1,4 +1,4 @@
-# Run-Tests.ps1
+﻿# Run-Tests.ps1
 # Test runner that sets up the environment for DnsTools testing
 
 param(

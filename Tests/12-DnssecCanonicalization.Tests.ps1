@@ -1,4 +1,4 @@
-# Tests/12-DnssecCanonicalization.Tests.ps1
+﻿# Tests/12-DnssecCanonicalization.Tests.ps1
 # DNSSEC Canonicalization Tests (RFC 4034)
 
 using module dnstools

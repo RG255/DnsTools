@@ -1,4 +1,4 @@
-# Tests/15-ResolverEdgeCases.Tests.ps1
+﻿# Tests/15-ResolverEdgeCases.Tests.ps1
 # Iterative Resolver Edge Case Tests
 
 using module dnstools

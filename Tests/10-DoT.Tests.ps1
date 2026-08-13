@@ -1,4 +1,4 @@
-# Tests/10-DoT.Tests.ps1
+﻿# Tests/10-DoT.Tests.ps1
 # DNS-over-TLS (DoT) Transport Tests
 
 using module dnstools
