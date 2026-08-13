@@ -1,4 +1,4 @@
-function Resolve-DnsIterative
+﻿function Resolve-DnsIterative
 {
     <#
     .SYNOPSIS
@@ -592,7 +592,12 @@ function Resolve-DnsIterative
                 }
             }
             catch {
-                # ignore and try next server
+                # Moving on to the next server is correct - one unreachable nameserver must not end
+                # the resolution. But a TOTALLY empty catch also swallows genuine faults (a null
+                # reference, a typo in a property name), which then present as "no servers
+                # responded" with nothing anywhere to say otherwise. Verbose keeps the control
+                # flow identical while leaving a trail when every server appears to fail.
+                Write-Verbose -Message ('Resolve-DnsIterative: server query failed, trying next: {0}' -f $_.Exception.Message)
             }
         }
     }

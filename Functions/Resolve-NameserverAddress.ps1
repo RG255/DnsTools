@@ -1,4 +1,4 @@
-function Resolve-NameserverAddress
+﻿function Resolve-NameserverAddress
 {
 	<#
 	.SYNOPSIS
@@ -145,7 +145,11 @@ function Resolve-NameserverAddress
 				}
 			}
 			catch {
-				# ignore and try next server
+				# Trying the next server is correct; a single unreachable nameserver must not end the
+				# lookup. But an entirely empty catch also hides genuine faults, and this function
+				# returns $null on total failure - so the caller sees "could not resolve" with no way
+				# to tell an unreachable server from a bug. Verbose leaves a trail, flow unchanged.
+				Write-Verbose -Message ('Resolve-NameserverAddress: server query failed, trying next: {0}' -f $_.Exception.Message)
 			}
 		}
 	}
