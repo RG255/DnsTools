@@ -18,16 +18,17 @@ starting from the root servers and following the delegation chain to authoritati
 
 ## Installation
 
-Copy the `0.4` folder to your PowerShell modules directory:
+Deploy with the repo's standard deployment script (installs to the admin-only, AllUsers
+Program Files module path):
 
-```
-Documents\WindowsPowerShell\Modules\DnsTools\0.4\
+```powershell
+powershell.exe -NoProfile -File "D:\PowerShellScripts\Modules\Deploy-Modules.ps1" -Module DnsTools -Version 0.6
 ```
 
 Then import:
 
 ```powershell
-Import-Module DnsTools -RequiredVersion 0.4
+Import-Module DnsTools -RequiredVersion 0.6
 ```
 
 ## Quick Start
