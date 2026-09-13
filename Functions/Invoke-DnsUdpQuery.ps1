@@ -31,7 +31,7 @@
 	$udp = New-Object -TypeName System.Net.Sockets.UdpClient
 	$udp.Client.ReceiveTimeout = $TimeoutMs
 
-	try 
+	try
 	{
 		$udp.Connect($server, $port)
 		$null = $udp.Send($query, $query.Length)
@@ -40,6 +40,6 @@
 		$resp = $udp.Receive([ref]$remote)
 		return $resp
 	}
-	finally 
+	finally
 	{$udp.Close()}
 }

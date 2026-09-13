@@ -1,7 +1,7 @@
 ﻿class DnsTxtRecord {
 	[string[]]$Strings
 
-	DnsTxtRecord([string[]]$strings) 
+	DnsTxtRecord([string[]]$strings)
 	{$this.Strings = $strings}
 
 	static [DnsTxtRecord] Parse([DnsBinaryReader]$r, [int]$len)
@@ -20,10 +20,10 @@
 		return [DnsTxtRecord]::new($strs.ToArray())
 	}
 
-	[byte[]]ToWire() 
+	[byte[]]ToWire()
 	{
 		$w = [DnsBinaryWriter]::new()
-		foreach ($s in $this.Strings) 
+		foreach ($s in $this.Strings)
 		{
 			$bytes = [System.Text.Encoding]::ASCII.GetBytes($s)
 			$w.WriteUInt8([byte]$bytes.Length)

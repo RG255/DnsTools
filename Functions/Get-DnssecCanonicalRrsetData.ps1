@@ -16,7 +16,7 @@
 
 	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
-	if (-not $Rrset -or $Rrset.Count -eq 0) 
+	if (-not $Rrset -or $Rrset.Count -eq 0)
 	{throw 'RRset is empty.'}
 
 	$name  = $Rrset[0].Name
@@ -24,9 +24,9 @@
 	$class = [uint16]$Rrset[0].Class
 
 	$records = @()
-	foreach ($rr in $Rrset) 
+	foreach ($rr in $Rrset)
 	{
-		if ($rr.Name -ne $name -or $rr.Type -ne $type -or $rr.Class -ne $class) 
+		if ($rr.Name -ne $name -or $rr.Type -ne $type -or $rr.Class -ne $class)
 		{throw 'Mixed RRset: all records must share name, type, class.'}
 
 		# [PSCustomObject], NOT a hashtable. Sort-Object -Property does NOT resolve a hashtable

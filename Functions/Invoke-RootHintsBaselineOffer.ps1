@@ -8,7 +8,7 @@
 		.DESCRIPTION
 		Called once at the end of module initialization. When the live (TLS-verified) root hints differ from
 		the shipped baseline, a real interactive console gets a timed key prompt: press 'Y' within the timeout
-		to save (which elevates via Update-DnsRootHints); Enter, any other key, or the timeout skips. Hosts that
+		to save (which elevates via Update-DnsRootHintsFile); Enter, any other key, or the timeout skips. Hosts that
 		do not support a raw key read (the VS Code console, remoting, redirected/non-interactive input) instead
 		get a single non-blocking notice. Declining or skipping is never an error.
 
@@ -45,7 +45,7 @@
 
 	if (-not $canPrompt)
 	{
-		Write-Host 'DnsTools: live root hints differ from the saved baseline. Run Update-DnsRootHints (elevation required) to persist them.' -ForegroundColor DarkCyan
+		Write-Host 'DnsTools: live root hints differ from the saved baseline. Run Update-DnsRootHintsFile (elevation required) to persist them.' -ForegroundColor DarkCyan
 		return
 	}
 
@@ -74,7 +74,7 @@
 
 	Write-Host ''
 	if ($doSave)
-	{Update-DnsRootHints}
+	{Update-DnsRootHintsFile}
 	else
-	{Write-Host 'Skipped. Run Update-DnsRootHints later to persist the change.' -ForegroundColor DarkGray}
+	{Write-Host 'Skipped. Run Update-DnsRootHintsFile later to persist the change.' -ForegroundColor DarkGray}
 }

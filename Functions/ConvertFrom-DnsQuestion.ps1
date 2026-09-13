@@ -13,16 +13,16 @@
 	.PARAMETER offset
 		Reference to the current offset in the packet (updated after parsing).
 	#>
-    param(
-        [byte[]]$packet,
-        [ref]$offset
-    )
+	param(
+		[byte[]]$packet,
+		[ref]$offset
+	)
 
-    $r = [DnsBinaryReader]::new($packet)
-    $r.Position = $offset.Value
+	$r = [DnsBinaryReader]::new($packet)
+	$r.Position = $offset.Value
 
-    $q = [DnsQuestion]::Parse($r)
-    $offset.Value = $r.Position
+	$q = [DnsQuestion]::Parse($r)
+	$offset.Value = $r.Position
 
-    return $q
+	return $q
 }

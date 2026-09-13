@@ -2,7 +2,7 @@
 	[string] $Server
 	[int]    $Port
 
-	DnsDotClient([string]$server, [int]$port = 853) 
+	DnsDotClient([string]$server, [int]$port = 853)
 	{
 		$this.Server = $server
 		$this.Port   = $port

@@ -10,9 +10,9 @@
 	.PARAMETER packet
 		The DNS packet bytes to parse.
 	#>
-    param(
-        [Parameter(Mandatory)]
-        [byte[]]$packet
-    )
-    return [DnsPacket]::Parse($packet)
+	param(
+		[Parameter(Mandatory)]
+		[byte[]]$packet
+	)
+	return [DnsPacket]::Parse($packet)
 }

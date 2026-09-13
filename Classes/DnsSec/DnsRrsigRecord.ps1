@@ -13,7 +13,7 @@
 		[uint16]$typeC,[byte]$alg,[byte]$labels,
 		[uint32]$origTtl,[uint32]$exp,[uint32]$inc,
 		[uint16]$keyTag,[string]$signer,[byte[]]$sig
-	) 
+	)
 	{
 		$this.TypeCovered = $typeC
 		$this.Algorithm   = $alg
@@ -26,7 +26,7 @@
 		$this.Signature   = $sig
 	}
 
-	static [DnsRrsigRecord] Parse([DnsBinaryReader]$r, [int]$len) 
+	static [DnsRrsigRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
 		# RDATA begins here
 		$startPos = $r.Position
@@ -47,12 +47,12 @@
 
 		# Remaining bytes belong to the signature
 		$remaining = $len - $bytesConsumed
-		if ($remaining -lt 0) 
+		if ($remaining -lt 0)
 		{throw "RRSIG parse overran RDLENGTH: consumed $bytesConsumed of $len"}
 
-		$sig = if ($remaining -gt 0) 
+		$sig = if ($remaining -gt 0)
 		{$r.ReadBytes($remaining)}
-		else 
+		else
 		{[byte[]]@()}
 
 		return [DnsRrsigRecord]::new(
@@ -61,7 +61,7 @@
 	}
 
 
-	[byte[]]ToWireHeaderAndName() 
+	[byte[]]ToWireHeaderAndName()
 	{
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteUInt16BE($this.TypeCovered)

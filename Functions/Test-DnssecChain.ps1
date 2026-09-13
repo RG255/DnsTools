@@ -34,7 +34,7 @@
 
 	$dsCheck = Test-DnssecDsForDnskey -DsRrset $DsRrset -DnskeyRrset $DnskeyRrset -ChildZoneName $ZoneName
 
-	if (-not ($dsCheck.Valid -contains $true)) 
+	if (-not ($dsCheck.Valid -contains $true))
 	{
 		return [pscustomobject]@{
 			Valid  = $false
@@ -42,14 +42,14 @@
 		}
 	}
 
-	foreach ($sigObj in $RrsigRrset) 
+	foreach ($sigObj in $RrsigRrset)
 	{
 		$sig = $sigObj.RDataObject
 		$key = $dnskeys |
-		Where-Object -FilterScript {$_.KeyTag -eq $sig.KeyTag -and $_.Algorithm -eq $sig.Algorithm} |
-		Select-Object -First 1
+			Where-Object -FilterScript {$_.KeyTag -eq $sig.KeyTag -and $_.Algorithm -eq $sig.Algorithm} |
+			Select-Object -First 1
 
-		if (-not $key) 
+		if (-not $key)
 		{
 			return [pscustomobject]@{
 				Valid  = $false
@@ -58,7 +58,7 @@
 		}
 
 		$ok = Test-DnssecRrsig -Rrsig $sig -Rrset $DnskeyRrset -DnskeyRrset $DnskeyRrset
-		if (-not $ok) 
+		if (-not $ok)
 		{
 			return [pscustomobject]@{
 				Valid  = $false

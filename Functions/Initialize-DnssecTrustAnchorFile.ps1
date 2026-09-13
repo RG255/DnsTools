@@ -1,4 +1,4 @@
-﻿function Initialize-DnssecTrustAnchors
+﻿function Initialize-DnssecTrustAnchorFile
 {
 	<#
 	.SYNOPSIS
@@ -11,5 +11,5 @@
 	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	$trustAnchorPath = Join-Path -Path $PSScriptRoot -ChildPath '..\Helpers\trust-anchors.json'
-	Import-DnssecTrustAnchors -Path $trustAnchorPath
+	Import-DnssecTrustAnchorFile -Path $trustAnchorPath
 }

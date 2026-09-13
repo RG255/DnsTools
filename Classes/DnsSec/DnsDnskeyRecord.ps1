@@ -4,8 +4,8 @@
 	[byte]  $Algorithm
 	[byte[]]$PublicKey
 	[uint16]$KeyTag
-    
-	DnsDnskeyRecord([uint16]$flags,[byte]$proto,[byte]$alg,[byte[]]$key) 
+
+	DnsDnskeyRecord([uint16]$flags,[byte]$proto,[byte]$alg,[byte[]]$key)
 	{
 		$this.Flags     = $flags
 		$this.Protocol  = $proto
@@ -13,7 +13,7 @@
 		$this.PublicKey = $key
 		$this.KeyTag = [DnsDnskeyRecord]::ComputeKeyTag($flags, $proto, $alg, $key)
 	}
-    
+
 	static [DnsDnskeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
 		$startPos = $r.Position
@@ -30,13 +30,13 @@
 		[byte]$proto,
 		[byte]$alg,
 		[byte[]]$key
-	) 
+	)
 	{
 		$sum = 0
 		$rdata = New-Object -TypeName System.Collections.Generic.List[byte]
 
 		$flagsBytes = [BitConverter]::GetBytes($flags)
-		if ([BitConverter]::IsLittleEndian) 
+		if ([BitConverter]::IsLittleEndian)
 		{[Array]::Reverse($flagsBytes)}
 		$rdata.AddRange($flagsBytes)
 
@@ -45,11 +45,11 @@
 		$rdata.AddRange($key)
 
 		$i = 0
-		foreach ($b in $rdata) 
+		foreach ($b in $rdata)
 		{
-			if ($i % 2 -eq 0) 
+			if ($i % 2 -eq 0)
 			{$sum += $b * 256}
-			else 
+			else
 			{$sum += $b}
 			$i++
 		}

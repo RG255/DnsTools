@@ -19,7 +19,10 @@
 	.PARAMETER Trace
 		Enable verbose trace output for debugging nameserver resolution.
 	#>
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '',
+		Justification = 'False positive - the analyzer cannot track the [string[]]-typed $glueAddrs variable through the loop/if nesting back to its "return $glueAddrs" statement; the declared OutputType is correct (confirmed by the explicit [string[]] type on the assignment).')]
 	[CmdletBinding()]
+	[OutputType([String[]])]
 	param(
 		[Parameter(Mandatory)]
 		[string]$nsName,
@@ -81,16 +84,16 @@
 				# -------------------------
 				# Glue handling
 				# -------------------------
-				$glueAddrs = @($resp.Additional |
-				Where-Object { $_.Type -in 1,28 } |
-				ForEach-Object {
-					if ($_.RDataObject -and $_.RDataObject.Address) {
-						$_.RDataObject.Address
-					}
-				} |
-				Where-Object { $_ } |
-				Sort-Object -Unique)
-				
+				[string[]]$glueAddrs = @($resp.Additional |
+						Where-Object { $_.Type -in 1,28 } |
+						ForEach-Object {
+							if ($_.RDataObject -and $_.RDataObject.Address) {
+								$_.RDataObject.Address
+							}
+						} |
+						Where-Object { $_ } |
+						Sort-Object -Unique)
+
 				if ($glueAddrs.Count -gt 0) {
 
 					if ($UseGlueOnly) {
@@ -110,13 +113,13 @@
 				if ($nsRecords.Count -eq 0) { continue }
 
 				$nsNames = $nsRecords |
-				ForEach-Object {
-					if ($_.RDataObject -and $_.RDataObject.NsName) {
-						$_.RDataObject.NsName
-					}
-				} |
-				Where-Object { $_ } |
-				Sort-Object -Unique
+					ForEach-Object {
+						if ($_.RDataObject -and $_.RDataObject.NsName) {
+							$_.RDataObject.NsName
+						}
+					} |
+					Where-Object { $_ } |
+					Sort-Object -Unique
 
 				if ($nsNames.Count -eq 0) { continue }
 
@@ -150,6 +153,7 @@
 				# returns $null on total failure - so the caller sees "could not resolve" with no way
 				# to tell an unreachable server from a bug. Verbose leaves a trail, flow unchanged.
 				Write-Verbose -Message ('Resolve-NameserverAddress: server query failed, trying next: {0}' -f $_.Exception.Message)
+				Write-MyCatchAudit -Source 'Resolve-NameserverAddress: one candidate nameserver failed to query - trying the next is correct, but the function returns $null on total failure with no way to tell an unreachable server from a bug' -ErrorRecord $_
 			}
 		}
 	}

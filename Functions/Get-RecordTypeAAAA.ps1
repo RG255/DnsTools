@@ -16,11 +16,11 @@
 	.PARAMETER offset
 		The offset in the packet (unused, for signature compatibility).
 	#>
-    param(
-        [byte[]]$rdata,
-        $packet,
-        [int]$offset
-    )
+	param(
+		[byte[]]$rdata,
+		$packet,
+		[int]$offset
+	)
 
-    return [DnsAaaaRecord]::Parse($rdata)
+	return [DnsAaaaRecord]::Parse($rdata)
 }

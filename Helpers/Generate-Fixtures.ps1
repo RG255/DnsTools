@@ -1,23 +1,23 @@
 ﻿using module dnstools
 
 param(
-    [string]$OutputPath = (Join-Path -Path (Split-Path -path $PSSCriptroot -parent) -ChildPath 'Tests\Fixtures')
+	[string]$OutputPath = (Join-Path -Path (Split-Path -path $PSSCriptroot -parent) -ChildPath 'Tests\Fixtures')
 )
 
 if (-not (Test-Path $OutputPath)) {
-    $null = New-Item -ItemType Directory -Path $OutputPath
+	$null = New-Item -ItemType Directory -Path $OutputPath
 }
 
 function Write-Fixture {
-		param(
-				[string]$Name,
-				[byte[]]$Bytes
-		)
+	param(
+		[string]$Name,
+		[byte[]]$Bytes
+	)
 
-		$path = Join-Path -Path $OutputPath -ChildPath $Name
-		[IO.File]::WriteAllBytes($path, $Bytes)
-		[string]$bl = $Bytes.Length
-		Write-Host ('Wrote {0} {1} {2}' -f $Path, $Bl, 'bytes')
+	$path = Join-Path -Path $OutputPath -ChildPath $Name
+	[IO.File]::WriteAllBytes($path, $Bytes)
+	[string]$bl = $Bytes.Length
+	Write-Host ('Wrote {0} {1} {2}' -f $Path, $Bl, 'bytes')
 }
 
 # ============================================================
@@ -25,23 +25,27 @@ function Write-Fixture {
 # ============================================================
 
 function New-ARecordObject {
-    param([string]$Address)
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+		Justification = 'Builds and returns an in-memory test-fixture object - changes no system state.')]
+	param([string]$Address)
 
-    $bytes  = [System.Net.IPAddress]::Parse($Address).GetAddressBytes()
-    $reader = [DnsBinaryReader]::new($bytes)
-    $obj    = [DnsARecord]::Parse($reader, $bytes.Length)
+	$bytes  = [System.Net.IPAddress]::Parse($Address).GetAddressBytes()
+	$reader = [DnsBinaryReader]::new($bytes)
+	$obj    = [DnsARecord]::Parse($reader, $bytes.Length)
 
-    return @{ Bytes = $bytes; Object = $obj }
+	return @{ Bytes = $bytes; Object = $obj }
 }
 
 function New-AaaaRecordObject {
-    param([string]$Address)
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+		Justification = 'Builds and returns an in-memory test-fixture object - changes no system state.')]
+	param([string]$Address)
 
-    $bytes  = [System.Net.IPAddress]::Parse($Address).GetAddressBytes()
-    $reader = [DnsBinaryReader]::new($bytes)
-    $obj    = [DnsAaaaRecord]::Parse($reader, $bytes.Length)
+	$bytes  = [System.Net.IPAddress]::Parse($Address).GetAddressBytes()
+	$reader = [DnsBinaryReader]::new($bytes)
+	$obj    = [DnsAaaaRecord]::Parse($reader, $bytes.Length)
 
-    return @{ Bytes = $bytes; Object = $obj }
+	return @{ Bytes = $bytes; Object = $obj }
 }
 
 # ============================================================
@@ -49,36 +53,38 @@ function New-AaaaRecordObject {
 # ============================================================
 
 function New-SimpleAResponse {
-    param(
-        [string]$Name,
-        [string]$Address
-    )
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+		Justification = 'Builds and returns an in-memory test-fixture packet - changes no system state.')]
+	param(
+		[string]$Name,
+		[string]$Address
+	)
 
-    $hdr = [DnsHeader]::new(
-        0x1234,
-        0x8180,
-        1, 1, 0, 0
-    )
+	$hdr = [DnsHeader]::new(
+		0x1234,
+		0x8180,
+		1, 1, 0, 0
+	)
 
-    $q = [DnsQuestion]::new($Name, 1, 1)
+	$q = [DnsQuestion]::new($Name, 1, 1)
 
-    $a = New-ARecordObject -Address $Address
+	$a = New-ARecordObject -Address $Address
 
-    $rr = [DnsResourceRecord]::new(
-        $Name,
-        1,
-        1,
-        300,
-        $a.Bytes,
-        $a.Object
-    )
+	$rr = [DnsResourceRecord]::new(
+		$Name,
+		1,
+		1,
+		300,
+		$a.Bytes,
+		$a.Object
+	)
 
-    $pkt = [DnsPacket]::new()
-    $pkt.Header = $hdr
-    $pkt.Questions.Add($q)
-    $pkt.Answers.Add($rr)
+	$pkt = [DnsPacket]::new()
+	$pkt.Header = $hdr
+	$pkt.Questions.Add($q)
+	$pkt.Answers.Add($rr)
 
-    return $pkt.ToArray()
+	return $pkt.ToArray()
 }
 
 # ============================================================
@@ -86,31 +92,35 @@ function New-SimpleAResponse {
 # ============================================================
 
 function New-CompressedNameFixture {
-    $w = [DnsBinaryWriter]::new()
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+		Justification = 'Builds and returns an in-memory test-fixture packet - changes no system state.')]
+	param ()
 
-    $w.WriteUInt16BE(0xAAAA)
-    $w.WriteUInt16BE(0x8180)
-    $w.WriteUInt16BE(1)
-    $w.WriteUInt16BE(1)
-    $w.WriteUInt16BE(0)
-    $w.WriteUInt16BE(0)
+	$w = [DnsBinaryWriter]::new()
 
-    $w.WriteName('www.example.com')
-    $w.WriteUInt16BE(5)
-    $w.WriteUInt16BE(1)
+	$w.WriteUInt16BE(0xAAAA)
+	$w.WriteUInt16BE(0x8180)
+	$w.WriteUInt16BE(1)
+	$w.WriteUInt16BE(1)
+	$w.WriteUInt16BE(0)
+	$w.WriteUInt16BE(0)
 
-    $w.WriteByte(0xC0)
-    $w.WriteByte(12)
+	$w.WriteName('www.example.com')
+	$w.WriteUInt16BE(5)
+	$w.WriteUInt16BE(1)
 
-    $w.WriteUInt16BE(5)
-    $w.WriteUInt16BE(1)
-    $w.WriteUInt32BE(300)
-    $w.WriteUInt16BE(2)
+	$w.WriteByte(0xC0)
+	$w.WriteByte(12)
 
-    $w.WriteByte(0xC0)
-    $w.WriteByte(12)
+	$w.WriteUInt16BE(5)
+	$w.WriteUInt16BE(1)
+	$w.WriteUInt32BE(300)
+	$w.WriteUInt16BE(2)
 
-    return $w.ToArray()
+	$w.WriteByte(0xC0)
+	$w.WriteByte(12)
+
+	return $w.ToArray()
 }
 
 Write-Fixture -Name 'compressed-name.bin' -Bytes (New-CompressedNameFixture)
@@ -128,19 +138,19 @@ $pkt.Header = [DnsHeader]::new(0x2222, 0x8180, 1, 5, 0, 0)
 $pkt.Questions.Add([DnsQuestion]::new('large.example.com', 1, 1))
 
 for ($i = 1; $i -le 5; $i++) {
-    $ip = "203.0.113.$i"
-    $a  = New-ARecordObject -Address $ip
+	$ip = "203.0.113.$i"
+	$a  = New-ARecordObject -Address $ip
 
-    $rr = [DnsResourceRecord]::new(
-        'large.example.com',
-        1,
-        1,
-        300,
-        $a.Bytes,
-        $a.Object
-    )
+	$rr = [DnsResourceRecord]::new(
+		'large.example.com',
+		1,
+		1,
+		300,
+		$a.Bytes,
+		$a.Object
+	)
 
-    $pkt.Answers.Add($rr)
+	$pkt.Answers.Add($rr)
 }
 
 Write-Fixture -Name 'dot-large-response.bin' -Bytes ($pkt.ToArray())

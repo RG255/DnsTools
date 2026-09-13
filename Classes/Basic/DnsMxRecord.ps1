@@ -2,20 +2,20 @@
 	[uint16]$Preference
 	[string]$Exchange
 
-	DnsMxRecord([uint16]$pref, [string]$exch) 
+	DnsMxRecord([uint16]$pref, [string]$exch)
 	{
 		$this.Preference = $pref
 		$this.Exchange   = $exch
 	}
 
-	static [DnsMxRecord] Parse([DnsBinaryReader]$r, [int]$len) 
+	static [DnsMxRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
 		$pref = $r.ReadUInt16BE()
 		$exch = $r.ReadName()
 		return [DnsMxRecord]::new($pref, $exch)
 	}
 
-	[byte[]]ToWire() 
+	[byte[]]ToWire()
 	{
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteUInt16BE($this.Preference)

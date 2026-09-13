@@ -47,7 +47,7 @@
 	#
 	$records = @($Nsec3Records | Where-Object -FilterScript {$_ -is [DnsNsec3Record]})
 
-	if (-not $records -or $records.Count -eq 0) 
+	if (-not $records -or $records.Count -eq 0)
 	{return $null}
 
 	#
@@ -61,30 +61,30 @@
 	#
 	# Walk from deepest label to shallowest
 	#
-	for ($i = 0; $i -lt $labels.Length; $i++) 
+	for ($i = 0; $i -lt $labels.Length; $i++)
 	{
 		# Build candidate name: e.g. "b.example.com"
 		$candidate = ($labels[$i..($labels.Length - 1)] -join '.')
 		if ($Trace) { Write-Trace -Message "CANDIDATE: '$candidate'" }
 
 		# Canonical form for hashing: MUST end with "."
-		$canon = if ($candidate.EndsWith('.')) 
+		$canon = if ($candidate.EndsWith('.'))
 		{$candidate}
-		else 
+		else
 		{$candidate + '.'}
 
 		# Compute NSEC3 hash for this candidate
 		$hash = Get-DnssecNsec3Hash `
-		-name $canon `
-		-Algorithm $HashAlgorithm `
-		-Iterations $Iterations `
-		-salt $salt
+			-name $canon `
+			-Algorithm $HashAlgorithm `
+			-Iterations $Iterations `
+			-salt $salt
 		if ($Trace) { Write-Trace -Message "HASH: $([BitConverter]::ToString($hash))" }
 
 		#
 		# Match against OwnerHash (NOT NextHash)
 		#
-		foreach ($rec in $records) 
+		foreach ($rec in $records)
 		{
 			if ( ($rec.OwnerHash -join ',') -eq ($hash -join ',') )
 			{

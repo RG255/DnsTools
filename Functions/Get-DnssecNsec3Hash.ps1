@@ -36,7 +36,7 @@
 
 	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
-	if ($Algorithm -ne 1) 
+	if ($Algorithm -ne 1)
 	{throw "Get-DnssecNsec3Hash: Only algorithm 1 (SHA-1) is supported (got $Algorithm)."}
 
 	# Canonicalize owner name: lowercase, FQDN, no trailing dot in wire labels
@@ -44,7 +44,7 @@
 
 	# Convert labels to wire format: <len><label>...<0>
 	$nameBytesList = [System.Collections.Generic.List[byte]]::new()
-	foreach ($label in $labels) 
+	foreach ($label in $labels)
 	{
 		$bytes = [System.Text.Encoding]::ASCII.GetBytes($label)
 		[void]$nameBytesList.Add([byte]$bytes.Length)
@@ -56,7 +56,7 @@
 
 	# Initial hash: H( name | salt )
 	$sha1 = [System.Security.Cryptography.SHA1]::Create()
-	try 
+	try
 	{
 		$input0 = New-Object -TypeName System.Collections.Generic.List[byte]
 		[void]$input0.AddRange($nameBytes)
@@ -64,7 +64,7 @@
 		$hash = $sha1.ComputeHash([byte[]]$input0.ToArray())
 
 		# Iterative hashing: for i in 1..Iterations: H( hash | salt )
-		for ($i = 0; $i -lt $Iterations; $i++) 
+		for ($i = 0; $i -lt $Iterations; $i++)
 		{
 			$input1 = New-Object -TypeName System.Collections.Generic.List[byte]
 			[void]$input1.AddRange($hash)
@@ -72,7 +72,7 @@
 			$hash = $sha1.ComputeHash([byte[]]$input1.ToArray())
 		}
 	}
-	finally 
+	finally
 	{$sha1.Dispose()}
 
 	return $hash

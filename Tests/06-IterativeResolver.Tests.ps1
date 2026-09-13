@@ -1,22 +1,22 @@
 ﻿using module dnstools
 Describe "Iterative Resolver" {
 
-    It "Follows root → TLD → zone → answer" {
-        $root = [System.IO.File]::ReadAllBytes("$PSScriptRoot/Fixtures/test06-root-referral.bin")
-        $tld  = [System.IO.File]::ReadAllBytes("$PSScriptRoot/Fixtures/test06-tld-referral.bin")
-        $auth = [System.IO.File]::ReadAllBytes("$PSScriptRoot/Fixtures/simple-a-record.bin")
+	It "Follows root → TLD → zone → answer" {
+		$root = [System.IO.File]::ReadAllBytes("$PSScriptRoot/Fixtures/test06-root-referral.bin")
+		$tld  = [System.IO.File]::ReadAllBytes("$PSScriptRoot/Fixtures/test06-tld-referral.bin")
+		$auth = [System.IO.File]::ReadAllBytes("$PSScriptRoot/Fixtures/simple-a-record.bin")
 
-        $script:call = 0
-        Mock Invoke-DnsUdpQuery {
-            switch ($script:call++) {
-                0 { return $root }
-                1 { return $tld }
-                2 { return $auth }
-            }
-        } -ModuleName DnsTools
+		$script:call = 0
+		Mock Invoke-DnsUdpQuery {
+			switch ($script:call++) {
+				0 { return $root }
+				1 { return $tld }
+				2 { return $auth }
+			}
+		} -ModuleName DnsTools
 
-        $resp = Resolve-DnsIterative -Name "www.example.com" -Type 1 -RootServers @("192.0.2.1") -Raw
-        $resp.Status | Should -Be "Final"
-        $resp.Response.Answers[0].RDataObject.Address | Should -Be "192.0.2.123"
-    }
+		$resp = Resolve-DnsIterative -Name "www.example.com" -Type 1 -RootServers @("192.0.2.1") -Raw
+		$resp.Status | Should -Be "Final"
+		$resp.Response.Answers[0].RDataObject.Address | Should -Be "192.0.2.123"
+	}
 }

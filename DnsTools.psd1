@@ -8,12 +8,12 @@
 
 @{
 	RootModule    = 'DnsTools.psm1'
-	ModuleVersion = '0.6'
+	ModuleVersion = '0.7'
 	GUID          = '8c594981-48d7-49c2-aa08-6ac52eaffec6'
 	Author        = 'Ray'
 	CompanyName   = 'Ray Labs'
 	Copyright     = '(c) 2026 Ray. All rights reserved.'
-	Description   = 'A full DNS, DNSSEC, DoT, DoH, and iterative resolver toolkit for PowerShell.'
+	Description   = 'A full DNS, DNSSEC, DoT, DoH, and iterative resolver toolkit for PowerShell. v0.7: PSScriptAnalyzer cleanup - 4 exported functions renamed to singular/reworded nouns (breaking change, see CHANGELOG.md).'
 	PowerShellVersion = '5.0'
 	# Explicit exports so PowerShell AUTO-LOADS this module on first use of any command
 	# (no manual Import-Module). These are all cross-platform (no FunctionsWindows), so
@@ -21,10 +21,14 @@
 	FunctionsToExport = @(
 		'Add-DnssecTrustAnchor', 'ConvertFrom-DnsClassCode', 'ConvertFrom-DnsPacket', 'ConvertFrom-DnssecAlgorithmCode',
 		'ConvertFrom-DnsTypeCode', 'ConvertTo-DnsClassCode', 'ConvertTo-DnssecAlgorithmCode', 'ConvertTo-DnsTypeCode',
-		'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName', 'Get-DnssecTrustAnchors',
-		'Import-DnssecTrustAnchors', 'Invoke-DnsUdpQuery', 'New-DnsQueryPacket',
+		'Clear-MyCatchAuditLog', 'Disable-MyCatchAudit', 'Enable-MyCatchAudit',
+		'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName', 'Get-DnssecTrustAnchorStore',
+		'Get-MyCatchAuditLog', 'Import-DnssecTrustAnchorFile', 'Invoke-DnsUdpQuery', 'Invoke-MyCatchAuditTriage', 'New-DnsQueryPacket',
 		'Resolve-DnsIterative', 'Resolve-Dnssec', 'Resolve-DnssecChain', 'Resolve-DnssecName',
-		'Test-DnssecName', 'Test-DnssecValidation', 'Update-DnsRootHints', 'Update-DnssecTrustAnchors'
+		'Show-MyCatchAuditSummary', 'Test-DnssecName', 'Test-DnssecValidation', 'Update-DnsRootHintsFile',
+		'Update-DnssecTrustAnchorFile'
+		# Write-MyCatchAudit deliberately NOT exported - vendored, internal-only, same as Get-MyError
+		# in every other module. See Modules\Shared-Usage.psd1's EXCEPTION note (2026-09-07).
 	)
 	CmdletsToExport   = @()
 	# '*' not @(): the psm1 exports its variable vocabulary via Export-ModuleMember

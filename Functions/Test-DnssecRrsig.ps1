@@ -24,7 +24,7 @@
 
 	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
-	if (-not (Test-DnssecTimeWindow -Rrsig $Rrsig)) 
+	if (-not (Test-DnssecTimeWindow -Rrsig $Rrsig))
 	{
 		return [pscustomobject]@{
 			Valid  = $false
@@ -48,9 +48,9 @@
 
 	return [pscustomobject]@{
 		Valid  = $ok
-		Reason = if ($ok) 
+		Reason = if ($ok)
 		{'OK'}
-		else 
+		else
 		{'Cryptographic signature check failed'}
 	}
 }

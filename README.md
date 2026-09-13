@@ -22,13 +22,13 @@ Deploy with the repo's standard deployment script (installs to the admin-only, A
 Program Files module path):
 
 ```powershell
-powershell.exe -NoProfile -File "D:\PowerShellScripts\Modules\Deploy-Modules.ps1" -Module DnsTools -Version 0.6
+powershell.exe -NoProfile -File "D:\PowerShellScripts\Modules\Deploy-Modules.ps1" -Module DnsTools -Version 0.7
 ```
 
 Then import:
 
 ```powershell
-Import-Module DnsTools -RequiredVersion 0.6
+Import-Module DnsTools -RequiredVersion 0.7
 ```
 
 ## Quick Start

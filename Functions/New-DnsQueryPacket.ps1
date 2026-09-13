@@ -16,6 +16,8 @@
 	.PARAMETER DoBit
 		Set the DNSSEC OK (DO) bit in the EDNS OPT record.
 	#>
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+		Justification = 'Builds and returns an in-memory byte array (a wire-format packet) - "New" here means constructs a value, not a system-state change.')]
 	param(
 		[string]$name,
 		[int]$type = 1,
@@ -35,7 +37,7 @@
 		[DnsQuestion]::new($name, $type, 1)
 	)
 
-	if ($DoBit) 
+	if ($DoBit)
 	{
 		$opt = [DnsOptRecord]::new(
 			4096,

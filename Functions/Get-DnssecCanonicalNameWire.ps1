@@ -19,7 +19,7 @@
 	# Force a strongly typed List[byte]
 	$bytes = New-Object -TypeName 'System.Collections.Generic.List[byte]'
 
-	foreach ($label in $labels) 
+	foreach ($label in $labels)
 	{
 		$labelBytes = [System.Text.Encoding]::ASCII.GetBytes($label)
 

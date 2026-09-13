@@ -24,7 +24,7 @@
 
 	# Type Covered
 	$tc = [BitConverter]::GetBytes([uint16]$Rrsig.TypeCovered)
-	if ([BitConverter]::IsLittleEndian) 
+	if ([BitConverter]::IsLittleEndian)
 	{[Array]::Reverse($tc)}
 	$bytes.AddRange($tc)
 
@@ -34,22 +34,22 @@
 
 	# Original TTL
 	$ttlBytes = [BitConverter]::GetBytes([uint32]$Rrsig.OriginalTTL)
-	if ([BitConverter]::IsLittleEndian) 
+	if ([BitConverter]::IsLittleEndian)
 	{[Array]::Reverse($ttlBytes)}
 	$bytes.AddRange($ttlBytes)
 
 	# Expiration, Inception
-	foreach ($val in @($Rrsig.Expiration, $Rrsig.Inception)) 
+	foreach ($val in @($Rrsig.Expiration, $Rrsig.Inception))
 	{
 		$t = [BitConverter]::GetBytes([uint32]$val)
-		if ([BitConverter]::IsLittleEndian) 
+		if ([BitConverter]::IsLittleEndian)
 		{[Array]::Reverse($t)}
 		$bytes.AddRange($t)
 	}
 
 	# Key Tag
 	$kt = [BitConverter]::GetBytes([uint16]$Rrsig.KeyTag)
-	if ([BitConverter]::IsLittleEndian) 
+	if ([BitConverter]::IsLittleEndian)
 	{[Array]::Reverse($kt)}
 	$bytes.AddRange($kt)
 
@@ -65,13 +65,13 @@
 
 	$typeBytes  = [BitConverter]::GetBytes($type)
 	$classBytes = [BitConverter]::GetBytes($class)
-	if ([BitConverter]::IsLittleEndian) 
+	if ([BitConverter]::IsLittleEndian)
 	{
 		[Array]::Reverse($typeBytes)
 		[Array]::Reverse($classBytes)
 	}
 
-	foreach ($rec in $sorted) 
+	foreach ($rec in $sorted)
 	{
 		$rdataWire = $rec.RdataWire
 
@@ -84,13 +84,13 @@
 
 		# TTL (Original TTL)
 		$ttlBytes = [BitConverter]::GetBytes([uint32]$Rrsig.OriginalTTL)
-		if ([BitConverter]::IsLittleEndian) 
+		if ([BitConverter]::IsLittleEndian)
 		{[Array]::Reverse($ttlBytes)}
 		$bytes.AddRange($ttlBytes)
 
 		# RDLENGTH
 		$rdlengthBytes = [BitConverter]::GetBytes([uint16]$rdataWire.Length)
-		if ([BitConverter]::IsLittleEndian) 
+		if ([BitConverter]::IsLittleEndian)
 		{[Array]::Reverse($rdlengthBytes)}
 		$bytes.AddRange($rdlengthBytes)
 

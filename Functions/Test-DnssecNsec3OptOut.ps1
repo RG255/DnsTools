@@ -23,7 +23,7 @@
 	# Opt-Out flag is bit 0
 	$optOut = ($Nsec3.Flags -band 0x01) -ne 0
 
-	if (-not $optOut) 
+	if (-not $optOut)
 	{return $false}
 
 	# Opt-Out only allowed for unsigned delegations

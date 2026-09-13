@@ -6,7 +6,7 @@
 	[uint16]$NsCount
 	[uint16]$ArCount
 
-	DnsHeader([uint16]$id, [uint16]$flags, [uint16]$qd, [uint16]$an, [uint16]$ns, [uint16]$ar) 
+	DnsHeader([uint16]$id, [uint16]$flags, [uint16]$qd, [uint16]$an, [uint16]$ns, [uint16]$ar)
 	{
 		$this.Id      = $id
 		$this.Flags   = $flags
@@ -16,7 +16,7 @@
 		$this.ArCount = $ar
 	}
 
-	static [DnsHeader] Parse([DnsBinaryReader]$r) 
+	static [DnsHeader] Parse([DnsBinaryReader]$r)
 	{
 		$idValue      = $r.ReadUInt16BE()
 		$flagsValue   = $r.ReadUInt16BE()
@@ -27,7 +27,7 @@
 		return [DnsHeader]::new($idValue, $flagsValue, $qdValue, $anValue, $nsValue, $arValue)
 	}
 
-	[void]Write([DnsBinaryWriter]$w) 
+	[void]Write([DnsBinaryWriter]$w)
 	{
 		$w.WriteUInt16BE($this.Id)
 		$w.WriteUInt16BE($this.Flags)

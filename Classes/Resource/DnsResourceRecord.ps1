@@ -13,7 +13,7 @@
 		[uint32]$ttl,
 		[byte[]]$raw,
 		[object]$obj
-	) 
+	)
 	{
 		$this.Name        = $name
 		$this.Type        = $type
@@ -23,14 +23,14 @@
 		$this.RDataObject = $obj
 	}
 
-	static [DnsResourceRecord] Parse([DnsBinaryReader]$r) 
+	static [DnsResourceRecord] Parse([DnsBinaryReader]$r)
 	{
 		$nameValue     = $r.ReadName()
 		$typeValue     = $r.ReadUInt16BE()
 		$classValue    = $r.ReadUInt16BE()
 		$ttlValue      = $r.ReadUInt32BE()
 		$rdlengthValue = $r.ReadUInt16BE()
-		# Save the position 
+		# Save the position
 		$start = $r.Position
 		$objValue = [DnsResourceRecord]::ParseRDataTyped($typeValue, $r, $rdlengthValue, $nameValue)
 		$r.Position = $start + $rdlengthValue
@@ -46,7 +46,7 @@
 		)
 	}
 
-	static [object] ParseRDataTyped([uint16]$type, [DnsBinaryReader]$r, [int]$len, [string]$ownerName) 
+	static [object] ParseRDataTyped([uint16]$type, [DnsBinaryReader]$r, [int]$len, [string]$ownerName)
 	{
 		switch ($type) {
 			1
@@ -63,7 +63,7 @@
 			{return [DnsPtrRecord]::Parse($r, $len)}
 			15
 			{return [DnsMxRecord]::Parse($r, $len)}
-			16 
+			16
 			{return [DnsTxtRecord]::Parse($r, $len)}
 			33
 			{return [DnsSrvRecord]::Parse($r, $len)}
@@ -101,7 +101,7 @@
 		return $null
 	}
 
-	[void] Write([DnsBinaryWriter]$w) 
+	[void] Write([DnsBinaryWriter]$w)
 	{
 		$w.WriteName($this.Name)
 		$w.WriteUInt16BE($this.Type)
@@ -111,7 +111,7 @@
 		$w.WriteBytes($this.RawRData)
 	}
 
-	[byte[]] ToCanonicalWire() 
+	[byte[]] ToCanonicalWire()
 	{
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteBytes( [byte[]](Get-DnssecCanonicalNameWire -name $this.Name) )

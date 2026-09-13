@@ -41,13 +41,13 @@
 
 	# 1. Closest Encloser
 	$ce = Find-DnssecNsec3ClosestEncloser `
-	-QueryName $QueryName `
-	-Nsec3Records $Nsec3Records `
-	-HashAlgorithm $HashAlgorithm `
-	-Iterations $Iterations `
-	-salt $salt
+		-QueryName $QueryName `
+		-Nsec3Records $Nsec3Records `
+		-HashAlgorithm $HashAlgorithm `
+		-Iterations $Iterations `
+		-salt $salt
 
-	if (-not $ce) 
+	if (-not $ce)
 	{
 		return [pscustomobject]@{
 			Nxdomain = $false
@@ -57,14 +57,14 @@
 
 	# 2. Next Closer
 	$nc = Find-DnssecNsec3NextCloser `
-	-QueryName $QueryName `
-	-ClosestEncloserName $ce.Name `
-	-Nsec3Records $Nsec3Records `
-	-HashAlgorithm $HashAlgorithm `
-	-Iterations $Iterations `
-	-salt $salt
+		-QueryName $QueryName `
+		-ClosestEncloserName $ce.Name `
+		-Nsec3Records $Nsec3Records `
+		-HashAlgorithm $HashAlgorithm `
+		-Iterations $Iterations `
+		-salt $salt
 
-	if (-not $nc) 
+	if (-not $nc)
 	{
 		return [pscustomobject]@{
 			Nxdomain = $false

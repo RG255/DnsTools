@@ -4,7 +4,7 @@
 	[byte]  $DigestType
 	[byte[]]$Digest
 
-	DnsDsRecord([uint16]$tag,[byte]$alg,[byte]$dtype,[byte[]]$digest) 
+	DnsDsRecord([uint16]$tag,[byte]$alg,[byte]$dtype,[byte[]]$digest)
 	{
 		$this.KeyTag     = $tag
 		$this.Algorithm  = $alg
@@ -23,7 +23,7 @@
 		return [DnsDsRecord]::new($tag,$alg,$dtype,$dig)
 	}
 
-	[byte[]]ToWire() 
+	[byte[]]ToWire()
 	{
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteUInt16BE($this.KeyTag)
@@ -33,7 +33,7 @@
 		return $w.ToArray()
 	}
 
-	[string] GetDigestHex() 
+	[string] GetDigestHex()
 	{
 		return ($this.Digest | ForEach-Object -Process {$_.ToString('x2')}) -join ''
 	}

@@ -11,7 +11,7 @@
 		[byte]$ver,
 		[uint16]$flags,
 		[byte[]]$opts
-	) 
+	)
 	{
 		$this.UdpPayloadSize = $udp
 		$this.ExtendedRcode  = $rcode
@@ -20,14 +20,14 @@
 		$this.Options        = $opts
 	}
 
-	static [DnsOptRecord] Parse([DnsBinaryReader]$r) 
+	static [DnsOptRecord] Parse([DnsBinaryReader]$r)
 	{
 		$name = $r.ReadUInt8()
-		if ($name -ne 0) 
+		if ($name -ne 0)
 		{throw 'Invalid OPT NAME (must be root)'}
 
 		$type = $r.ReadUInt16BE()
-		if ($type -ne 41) 
+		if ($type -ne 41)
 		{throw 'Invalid OPT TYPE'}
 
 		$udp  = $r.ReadUInt16BE()
@@ -47,7 +47,7 @@
 		)
 	}
 
-	[void]Write([DnsBinaryWriter]$w) 
+	[void]Write([DnsBinaryWriter]$w)
 	{
 		$w.WriteUInt8(0)
 		$w.WriteUInt16BE(41)

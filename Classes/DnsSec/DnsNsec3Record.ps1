@@ -69,18 +69,18 @@
 		$nxtHash = $r.ReadBytes($hashLen)
 
 		$typs = New-Object -TypeName System.Collections.Generic.List[int]
-		while ($r.Position -lt $endPos) 
+		while ($r.Position -lt $endPos)
 		{
 			$block = $r.ReadUInt8()
 			$len   = $r.ReadUInt8()
-			if ($len -lt 1 -or $len -gt 32) 
+			if ($len -lt 1 -or $len -gt 32)
 			{throw "Invalid NSEC3 bitmap length: $len"}
 			$bits  = $r.ReadBytes($len)
-			for ($b = 0; $b -lt $bits.Length; $b++) 
+			for ($b = 0; $b -lt $bits.Length; $b++)
 			{
-				for ($bit = 0; $bit -lt 8; $bit++) 
+				for ($bit = 0; $bit -lt 8; $bit++)
 				{
-					if ($bits[$b] -band (1 -shl (7-$bit))) 
+					if ($bits[$b] -band (1 -shl (7-$bit)))
 					{$null = $typs.Add($block * 256 + $b*8 + $bit)}
 				}
 			}
@@ -93,43 +93,43 @@
 			$typs.ToArray()
 		)
 	}
-    
-	[byte[]]ToWire() 
+
+	[byte[]]ToWire()
 	{
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteUInt8($this.HashAlgorithm)
 		$w.WriteUInt8($this.Flags)
 		$w.WriteUInt16BE($this.Iterations)
 
-		if ($this.Salt -and $this.Salt.Length -gt 0) 
+		if ($this.Salt -and $this.Salt.Length -gt 0)
 		{
 			$w.WriteUInt8([byte]$this.Salt.Length)
 			$w.WriteBytes($this.Salt)
 		}
-		else 
+		else
 		{$w.WriteUInt8(0)}
 
 		$w.WriteUInt8([byte]$this.NextHash.Length)
 		$w.WriteBytes($this.NextHash)
 
 		$byBlock = @{}
-		foreach ($t in $this.Types) 
+		foreach ($t in $this.Types)
 		{
 			$block  = [int]([math]::Floor($t / 256))
 			$offset = $t % 256
-			if (-not $byBlock.ContainsKey($block)) 
+			if (-not $byBlock.ContainsKey($block))
 			{$byBlock[$block] = New-Object -TypeName System.Collections.Generic.List[int]}
 			$null = $byBlock[$block].Add($offset)
 		}
 
-		foreach ($kv in $byBlock.GetEnumerator() | Sort-Object -Property Key) 
+		foreach ($kv in $byBlock.GetEnumerator() | Sort-Object -Property Key)
 		{
 			$block   = [byte]$kv.Key
 			$offsets = $kv.Value | Sort-Object
 			$maxByte = [int]([math]::Floor(($offsets | Measure-Object -Maximum).Maximum / 8))
 			$bitmap  = New-Object -TypeName 'byte[]' -ArgumentList ($maxByte+1)
 
-			foreach ($o in $offsets) 
+			foreach ($o in $offsets)
 			{
 				$b   = [int]([math]::Floor($o / 8))
 				$bit = $o % 8

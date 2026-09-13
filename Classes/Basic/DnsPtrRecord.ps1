@@ -1,18 +1,18 @@
 ﻿class DnsPtrRecord {
-    [string]$Pointer
+	[string]$Pointer
 
-    DnsPtrRecord([string]$pointer) {
-        $this.Pointer = $pointer
-    }
+	DnsPtrRecord([string]$pointer) {
+		$this.Pointer = $pointer
+	}
 
-    static [DnsPtrRecord] Parse([DnsBinaryReader]$r, [int]$len) {
-        $name = $r.ReadName()
-        return [DnsPtrRecord]::new($name)
-    }
+	static [DnsPtrRecord] Parse([DnsBinaryReader]$r, [int]$len) {
+		$name = $r.ReadName()
+		return [DnsPtrRecord]::new($name)
+	}
 
-    [byte[]]ToWire() {
-        $w = [DnsBinaryWriter]::new()
-        $w.WriteName($this.Pointer)
-        return $w.ToArray()
-    }
+	[byte[]]ToWire() {
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName($this.Pointer)
+		return $w.ToArray()
+	}
 }

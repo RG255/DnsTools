@@ -2,7 +2,7 @@
 # Wrapper script that sets up the environment for fixture generation
 
 param(
-    [string]$OutputPath
+	[string]$OutputPath
 )
 
 # Export all functions for fixture generation
@@ -12,7 +12,7 @@ $env:DNSTOOLS_EXPORT_ALL = '1'
 $scriptPath = Join-Path $PSScriptRoot 'Generate-Fixtures.ps1'
 
 if ($OutputPath) {
-    & $scriptPath -OutputPath $OutputPath
+	& $scriptPath -OutputPath $OutputPath
 } else {
-    & $scriptPath
+	& $scriptPath
 }

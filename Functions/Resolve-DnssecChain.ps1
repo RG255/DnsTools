@@ -47,14 +47,14 @@
 	$validatedZones = @{}
 	$validatedZones['.'] = $rootKeys  # trust anchor
 
-	for ($i = 1; $i -lt $zones.Count; $i++) 
+	for ($i = 1; $i -lt $zones.Count; $i++)
 	{
 		$child  = $zones[$i]
 		$parent = $zones[$i - 1]
 
 		$zoneResult = Resolve-DnssecZone -Zone $child -ParentZone $parent -RootServers $RootServers -Trace:$Trace
 
-		if (-not $zoneResult.Valid) 
+		if (-not $zoneResult.Valid)
 		{
 			return [pscustomobject]@{
 				Valid  = $false
@@ -69,7 +69,7 @@
 	# 3. Finally, validate the RRset at $Name using the last zone's keys
 	$leaf = Resolve-Dnssec -name $name -type $TypeCode -RootServers $RootServers -Trace:$Trace
 
-	if (-not $leaf.Valid) 
+	if (-not $leaf.Valid)
 	{
 		return [pscustomobject]@{
 			Valid  = $false

@@ -80,7 +80,7 @@
 
 	# Initialize trust anchors
 	try {
-		Initialize-DnssecTrustAnchors
+		Initialize-DnssecTrustAnchorFile
 		Add-ReportEntry -Section 'INITIALIZATION' -Level 'SUCCESS' -Message 'Trust anchors initialized'
 	}
 	catch {
@@ -89,7 +89,7 @@
 
 	# Step 1: Check trust anchors
 	Add-ReportEntry -Section 'TRUST ANCHORS' -Message 'Checking configured trust anchors'
-	$trustAnchors = @(Get-DnssecTrustAnchors)
+	$trustAnchors = @(Get-DnssecTrustAnchorStore)
 	if ($trustAnchors -and $trustAnchors.Count -gt 0) {
 		foreach ($anchor in $trustAnchors) {
 			Add-ReportEntry -Section 'TRUST ANCHORS' -Message "Zone: $($anchor.Zone), KeyTag: $($anchor.KeyTag), Algorithm: $($anchor.Algorithm), DigestType: $($anchor.DigestType)"
@@ -233,7 +233,7 @@
 
 					# Verify signature
 					$signedData = Get-DnssecSignedData -Rrsig $rrsigData -Rrset $dnskeyRecords
-			$sigValid = Test-DnssecSignature -SignedData $signedData -Rrsig $rrsigData -Dnskey $signingKey.RDataObject
+					$sigValid = Test-DnssecSignature -SignedData $signedData -Rrsig $rrsigData -Dnskey $signingKey.RDataObject
 					if ($sigValid) {
 						Add-ReportEntry -Section 'RRSIG VALIDATION' -Level 'SUCCESS' -Message "Signature valid for RRSIG KeyTag=$($rrsigData.KeyTag)"
 						$validSigs++

@@ -30,12 +30,12 @@
 	$anchor = $script:TrustAnchors[$Zone]
 
 	# HARDENING GOES HERE
-	if ($null -eq $anchor) 
+	if ($null -eq $anchor)
 	{return $false}
 
-	if ($Dnskey.KeyTag -ne $anchor.KeyTag) 
+	if ($Dnskey.KeyTag -ne $anchor.KeyTag)
 	{return $false}
-	if ($Dnskey.Algorithm -ne $anchor.Algorithm) 
+	if ($Dnskey.Algorithm -ne $anchor.Algorithm)
 	{return $false}
 
 	$digest = Get-DnssecKeyDigestHex -OwnerName $Zone -Dnskey $Dnskey -DigestType $anchor.DigestType

@@ -1,7 +1,7 @@
 ﻿class DnsDohClient {
 	[string] $Endpoint
 
-	DnsDohClient([string]$endpoint) 
+	DnsDohClient([string]$endpoint)
 	{$this.Endpoint = $endpoint}
 
 	[DnsPacket] Query([DnsPacket]$packet)

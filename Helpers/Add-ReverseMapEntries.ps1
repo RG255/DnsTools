@@ -5,7 +5,7 @@ param(
 )
 
 # Validate input
-if (-not ($Map -is [System.Collections.IDictionary])) 
+if (-not ($Map -is [System.Collections.IDictionary]))
 {throw 'Input must be a hashtable or ordered hashtable.'}
 
 # Detect ordered vs unordered
@@ -14,7 +14,7 @@ $isOrdered = $Map -is [System.Collections.Specialized.OrderedDictionary]
 # Copy keys so we don't modify while iterating
 $keys = @($Map.Keys)
 
-foreach ($key in $keys) 
+foreach ($key in $keys)
 {
 	$value = $Map[$key]
 
@@ -23,15 +23,15 @@ foreach ($key in $keys)
 	{continue}
 
 	# Skip if reverse entry already exists
-	if ($Map.Contains($value)) 
+	if ($Map.Contains($value))
 	{continue}
 
-	if ($isOrdered) 
+	if ($isOrdered)
 	{
 		# OrderedDictionary requires .Add()
 		$Map.Add($value, $key)
 	}
-	else 
+	else
 	{
 		# Normal hashtable supports simple assignment
 		$Map[$value] = $key

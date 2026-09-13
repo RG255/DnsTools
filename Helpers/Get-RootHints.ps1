@@ -15,7 +15,7 @@
 	$userCacheDir = Join-Path -Path ([Environment]::GetFolderPath('LocalApplicationData')) -ChildPath 'DnsTools'
 	$userCache    = Join-Path -Path $userCacheDir -ChildPath 'RootHints-Cache.xml'
 
-	# Session state consumed later (after functions load) by Invoke-RootHintsBaselineOffer / Update-DnsRootHints:
+	# Session state consumed later (after functions load) by Invoke-RootHintsBaselineOffer / Update-DnsRootHintsFile:
 	# the verified result from this load and whether it differs from the trusted baseline. Set at module scope.
 	$script:DnsRootHintsVerified        = $null
 	$script:DnsRootHintsBaselineDiffers = $false
@@ -156,9 +156,9 @@
 	# Build flat list of usable IPs
 	$RootServerAddresses =
 	$RootServers |
-	ForEach-Object -Process {
-		@($_.IPv4, $_.IPv6) | Where-Object -FilterScript {$_}
-	}
+		ForEach-Object -Process {
+			@($_.IPv4, $_.IPv6) | Where-Object -FilterScript {$_}
+		}
 
 	# Create the result object
 	$result = [pscustomobject]@{

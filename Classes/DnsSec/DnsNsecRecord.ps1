@@ -2,20 +2,20 @@
 	[string] $NextDomainName
 	[int[]]  $Types
 
-	DnsNsecRecord([string]$next,[int[]]$types) 
+	DnsNsecRecord([string]$next,[int[]]$types)
 	{
 		$this.NextDomainName = $next
 		$this.Types          = $types
 	}
 
-	static [string] ReadUncompressedName([DnsBinaryReader]$r) 
+	static [string] ReadUncompressedName([DnsBinaryReader]$r)
 	{
 		$labels = New-Object -TypeName System.Collections.Generic.List[string]
 
-		while ($true) 
+		while ($true)
 		{
 			$len = $r.ReadUInt8()
-			if ($len -eq 0) 
+			if ($len -eq 0)
 			{break}
 
 			$labelBytes = $r.ReadBytes($len)
@@ -32,21 +32,21 @@
 		$next = ([DnsNsecRecord]::ReadUncompressedName($r)).ToLowerInvariant()
 		$typs = New-Object -TypeName System.Collections.Generic.List[int]
 
-		while ($r.Position -lt $endPos) 
+		while ($r.Position -lt $endPos)
 		{
 			$block = $r.ReadUInt8()
 			$len   = $r.ReadUInt8()
 
-			if ($len -lt 1 -or $len -gt 32) 
+			if ($len -lt 1 -or $len -gt 32)
 			{throw "Invalid NSEC bitmap length: $len"}
 
 			$bits  = $r.ReadBytes($len)
 
-			for ($b = 0; $b -lt $bits.Length; $b++) 
+			for ($b = 0; $b -lt $bits.Length; $b++)
 			{
-				for ($bit = 0; $bit -lt 8; $bit++) 
+				for ($bit = 0; $bit -lt 8; $bit++)
 				{
-					if ($bits[$b] -band (1 -shl (7-$bit))) 
+					if ($bits[$b] -band (1 -shl (7-$bit)))
 					{$null = $typs.Add($block * 256 + $b*8 + $bit)}
 				}
 			}
@@ -55,29 +55,29 @@
 		return [DnsNsecRecord]::new($next, $typs.ToArray())
 	}
 
-	[byte[]]ToWire() 
+	[byte[]]ToWire()
 	{
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteName($this.NextDomainName)
 
 		$byBlock = @{}
-		foreach ($t in $this.Types) 
+		foreach ($t in $this.Types)
 		{
 			$block  = [int]([math]::Floor($t / 256))
 			$offset = $t % 256
-			if (-not $byBlock.ContainsKey($block)) 
+			if (-not $byBlock.ContainsKey($block))
 			{$byBlock[$block] = New-Object -TypeName System.Collections.Generic.List[int]}
 			$null = $byBlock[$block].Add($offset)
 		}
 
-		foreach ($kv in $byBlock.GetEnumerator() | Sort-Object -Property Key) 
+		foreach ($kv in $byBlock.GetEnumerator() | Sort-Object -Property Key)
 		{
 			$block   = [byte]$kv.Key
 			$offsets = $kv.Value | Sort-Object
 			$maxByte = [int]([math]::Floor(($offsets | Measure-Object -Maximum).Maximum / 8))
 			$bitmap  = New-Object -TypeName 'byte[]' -ArgumentList ($maxByte+1)
 
-			foreach ($o in $offsets) 
+			foreach ($o in $offsets)
 			{
 				$b   = [int]([math]::Floor($o / 8))
 				$bit = $o % 8

@@ -94,8 +94,8 @@ skipping is never an error** - the session simply keeps using the verified set i
 on demand at any time:
 
 ```powershell
-Update-DnsRootHints            # save the verified set captured this session (one UAC)
-Update-DnsRootHints -Refresh   # re-fetch named.root first, then save
+Update-DnsRootHintsFile            # save the verified set captured this session (one UAC)
+Update-DnsRootHintsFile -Refresh   # re-fetch named.root first, then save
 ```
 
 The change-detection compares only the root names and IP addresses; the cache timestamp is ignored, so an
@@ -318,10 +318,10 @@ DNSSEC validation requires trust anchors. The module includes the current IANA r
 ### Update Trust Anchors
 ```powershell
 # Fetch current trust anchors from IANA
-Update-DnssecTrustAnchors
+Update-DnssecTrustAnchorFile
 
 # Update and save to file
-Update-DnssecTrustAnchors -Force
+Update-DnssecTrustAnchorFile -Force
 ```
 
 ## Troubleshooting

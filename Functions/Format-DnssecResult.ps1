@@ -14,20 +14,20 @@
 		[psobject]$result
 	)
 
-	if (-not $result) 
+	if (-not $result)
 	{return 'No result'}
 
-	$status = if ($result.Valid) 
+	$status = if ($result.Valid)
 	{'VALID'}
-	else 
+	else
 	{'BOGUS'}
 
 	$msg = "DNSSEC Status: $status`nReason: $($result.Reason)"
 
-	if ($result.Answer) 
+	if ($result.Answer)
 	{
 		$msg += "`nAnswers:`n"
-		foreach ($a in $result.Answer) 
+		foreach ($a in $result.Answer)
 		{$msg += "  $($a.Name) $($a.Type) $($a.RDataObject)`n"}
 	}
 

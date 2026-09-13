@@ -10,10 +10,10 @@
 	.PARAMETER packet
 		The DNS packet bytes containing the header.
 	#>
-    param(
-        [byte[]]$packet
-    )
+	param(
+		[byte[]]$packet
+	)
 
-    $r = [DnsBinaryReader]::new($packet)
-    return [DnsHeader]::Parse($r)
+	$r = [DnsBinaryReader]::new($packet)
+	return [DnsHeader]::Parse($r)
 }

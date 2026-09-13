@@ -21,11 +21,11 @@
 	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 
 	$candidates = $DnskeyRrset |
-	Where-Object -FilterScript {
-		$_.Type -eq 48 -and $_.RDataObject -is [DnsDnskeyRecord] -and
-		$_.RDataObject.KeyTag -eq $Rrsig.KeyTag -and
-		$_.RDataObject.Algorithm -eq $Rrsig.Algorithm
-	}
+		Where-Object -FilterScript {
+			$_.Type -eq 48 -and $_.RDataObject -is [DnsDnskeyRecord] -and
+			$_.RDataObject.KeyTag -eq $Rrsig.KeyTag -and
+			$_.RDataObject.Algorithm -eq $Rrsig.Algorithm
+		}
 
 	return $candidates | Select-Object -First 1
 }

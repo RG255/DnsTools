@@ -1,4 +1,4 @@
-﻿function Import-DnssecTrustAnchors
+﻿function Import-DnssecTrustAnchorFile
 {
 	<#
 	.SYNOPSIS
@@ -26,23 +26,23 @@
 
 	$json = Get-Content -Raw -Path $Path | ConvertFrom-Json
 
-	foreach ($anchor in $json) 
+	foreach ($anchor in $json)
 	{
 		# Basic validation
-		if (-not $anchor.Zone)        
+		if (-not $anchor.Zone)
 		{continue}
-		if (-not $anchor.KeyTag)      
+		if (-not $anchor.KeyTag)
 		{continue}
-		if (-not $anchor.Algorithm)   
+		if (-not $anchor.Algorithm)
 		{continue}
-		if (-not $anchor.DigestType)  
+		if (-not $anchor.DigestType)
 		{continue}
-		if (-not $anchor.DigestHex)   
+		if (-not $anchor.DigestHex)
 		{continue}
 
 		# Normalize zone name
 		$Zone = $anchor.Zone.Trim().ToLower()
-		if ($Zone -eq '') 
+		if ($Zone -eq '')
 		{$Zone = '.'}
 
 		# Insert validated anchor

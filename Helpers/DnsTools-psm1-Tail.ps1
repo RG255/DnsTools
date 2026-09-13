@@ -10,9 +10,10 @@ $PSD1Path         = Join-Path -Path $ModuleScriptRoot -ChildPath ('{0}.psd1' -f 
 # 1. Support functions
 # ============================================================
 
-function Get-Psd1Data 
+function Get-Psd1Data
 {
 	[CmdletBinding()]
+	[OutputType([Hashtable])]
 	param(
 		[Parameter(Mandatory)]
 		[Microsoft.PowerShell.DesiredStateConfiguration.ArgumentToConfigurationDataTransformation()]
@@ -21,7 +22,7 @@ function Get-Psd1Data
 	$PathToPsd1file
 }
 
-function Initialize-Folders 
+function Initialize-Folder
 {
 	[CmdletBinding()]
 	param(
@@ -29,15 +30,15 @@ function Initialize-Folders
 		[Array] $Folders
 	)
 
-	foreach ($Item in $Folders) 
+	foreach ($Item in $Folders)
 	{
 		$Path = Join-Path -Path $ModuleScriptRoot -ChildPath $Item
-		if (-not (Test-Path -Path $Path)) 
+		if (-not (Test-Path -Path $Path))
 		{$null = New-Item -Path $Path -ItemType Directory}
 	}
 }
 
-function Publish-MyEnvironment 
+function Publish-MyEnvironment
 {
 	[CmdletBinding()]
 	param(
@@ -54,38 +55,38 @@ function Publish-MyEnvironment
 		}
 	}
 
-	if ($MyCustomXML = Get-ChildItem -Path (Join-Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-CustomXML.ps1' -f $Option)) -ErrorAction Ignore) 
+	if ($MyCustomXML = Get-ChildItem -Path (Join-Path $ModuleScriptRoot -ChildPath ('Functions{0}\Define-CustomXML.ps1' -f $Option)) -ErrorAction Ignore)
 	{
-		foreach ($Item in ($MyCustomXML.FullName | Sort-Object)) 
+		foreach ($Item in ($MyCustomXML.FullName | Sort-Object))
 		{. $Item}
 	}
 }
 
-function Publish-CustomXML 
+function Publish-CustomXML
 {
-	foreach ($Item in ($MyCustomXML.GetEnumerator() | Sort-Object -Property key).Name) 
+	foreach ($Item in ($MyCustomXML.GetEnumerator() | Sort-Object -Property key).Name)
 	{
 		$XMLItem = Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions{0}\{1}' -f $Option, $MyCustomXML[$Item].file)
-		if (Test-Path -Path $XMLItem) 
+		if (Test-Path -Path $XMLItem)
 		{
 			switch ($MyCustomXML[$Item].Action) {
-				'Update-FormatData' 
+				'Update-FormatData'
 				{
 					switch ($MyCustomXML[$Item].Option) {
-						'Prependpath' 
+						'Prependpath'
 						{Update-FormatData -PrependPath $XMLItem -ErrorAction Stop}
-						'Appendpath'  
+						'Appendpath'
 						{Update-FormatData -AppendPath  $XMLItem -ErrorAction Stop}
 					}
 				}
-				default 
+				default
 				{"Unknown item in `$MyCustomXML: [$Item] Option: [$($MyCustomXML[$Item].Option)]" | Write-Warning}
 			}
 		}
 	}
 }
 
-Function Publish-Variables
+Function Publish-Variable
 {
 	<#
 			.SYNOPSIS
@@ -95,11 +96,11 @@ Function Publish-Variables
 			As Above
 
 			.EXAMPLE
-			Publish-Variables is called from the file Define-Variables.ps1 which is executed as part
+			Publish-Variable is called from the file Define-Variables.ps1 which is executed as part
 			of this psm1 file when the module is initialised.
 
 			.EXAMPLE
-			Publish-Variables -Variables $MyVars
+			Publish-Variable -Variables $MyVars
 	#>
 	Param ([hashtable]$Variables)
 	Try
@@ -132,7 +133,7 @@ Function Publish-Variables
 				New-Variable @Params -ErrorAction Stop
 				Export-ModuleMember -Variable $Item -ErrorAction Stop
 				$var = Get-Variable -Name VInfoOn -Scope Local -ErrorAction SilentlyContinue
-				if ($var -and $var.Value -is [bool] -and $var.Value) 
+				if ($var -and $var.Value -is [bool] -and $var.Value)
 				{
 					{
 						$Msg = 'Variable:[{0}] created Value: [{1}]' -f $Item, $Params.Value
@@ -153,21 +154,21 @@ Function Publish-Variables
 # 2. MAIN MODULE INITIALIZATION
 # ============================================================
 
-try 
+try
 {
-	Initialize-Folders -Folders @(
-		'Classes\BinaryInfrastructure', 
-		'Classes\Core', 
-		'Classes\Basic', 
-		'Classes\DNSSEC', 
-		'Classes\Resource', 
-		'Classes\EDNS-OPT', 
-		'Classes\DNS', 
-		'Classes\Transport', 
-		'Helpers', 
-		'Functions', 
-		'FunctionsLinux', 
-		'FunctionsWindows', 
+	Initialize-Folder -Folders @(
+		'Classes\BinaryInfrastructure',
+		'Classes\Core',
+		'Classes\Basic',
+		'Classes\DNSSEC',
+		'Classes\Resource',
+		'Classes\EDNS-OPT',
+		'Classes\DNS',
+		'Classes\Transport',
+		'Helpers',
+		'Functions',
+		'FunctionsLinux',
+		'FunctionsWindows',
 		'FunctionsMacOS'
 	)
 
@@ -187,8 +188,12 @@ try
 	$VarDefFiles = @($PSD1Data.PrivateData.ModuleVars[''].Values)
 	$Exclude = @('Define-CustomXML|\.zip$')
 	$MyPath = (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions\*{0}' -f $StrExtPS1) -ErrorAction Stop)
-	$CommonFunctions = (Get-ChildItem -Path $MyPath -ErrorAction stop | Where-Object {$_.Name -inotmatch $Exclude -and $_.Name -notin $VarDefFiles} ) |
-	Where-Object {$_.Name -inotmatch $Exclude}
+	# Vendored CommonScripts copies (see Shared-Usage.psd1) sit in their own 'vendored' subfolder
+	# (changed 2026-09-13) for filesystem visibility - unioned in here so they go through the same
+	# export-table logic below.
+	$MyVendoredPath = (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions\vendored\*{0}' -f $StrExtPS1))
+	$CommonFunctions = (@(Get-ChildItem -Path $MyPath -ErrorAction stop) + @(Get-ChildItem -Path $MyVendoredPath -ErrorAction SilentlyContinue) | Where-Object {$_.Name -inotmatch $Exclude -and $_.Name -notin $VarDefFiles} ) |
+		Where-Object {$_.Name -inotmatch $Exclude}
 
 	foreach ($Item in $CommonFunctions)
 	{
@@ -205,9 +210,9 @@ try
 			$funcName = $Item.BaseName
 			# Export all if env var set, otherwise check export table
 			$shouldExport = $ExportAll -or $true  # Default to export if not in table
-			if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+			if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName))
 			{$shouldExport = $script:FunctionExportTable[$funcName]}
-			if ($shouldExport) 
+			if ($shouldExport)
 			{Export-ModuleMember -Function $funcName -ErrorAction Stop}
 		}
 	}
@@ -220,7 +225,7 @@ try
 			$VarDefFiles = @($PSD1Data.PrivateData.ModuleVars['Windows'].Values)
 			$Exclude = @('Define-CustomXML|{0}$' -f $StrExtZip)
 			$WinFunctions = Get-ChildItem (Join-Path $ModuleScriptRoot -ChildPath 'FunctionsWindows\*.ps1') |
-			Where-Object {$_.Name -inotmatch $Exclude -and $_.Name -notin $VarDefFiles}
+				Where-Object {$_.Name -inotmatch $Exclude -and $_.Name -notin $VarDefFiles}
 
 			foreach ($Item in $WinFunctions)
 			{
@@ -236,9 +241,9 @@ try
 				{
 					$funcName = $Item.BaseName
 					$shouldExport = $ExportAll -or $true
-					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName))
 					{$shouldExport = $script:FunctionExportTable[$funcName]}
-					if ($shouldExport) 
+					if ($shouldExport)
 					{Export-ModuleMember -Function $funcName -ErrorAction Stop}
 				}
 			}
@@ -247,7 +252,7 @@ try
 		{
 			Publish-MyEnvironment -Option 'Linux'
 			$LinFunctions = Get-ChildItem (Join-Path $ModuleScriptRoot -ChildPath 'FunctionsLinux\*.ps1') |
-			Where-Object {$_.Name -inotmatch $Exclude}
+				Where-Object {$_.Name -inotmatch $Exclude}
 
 			foreach ($Item in $LinFunctions)
 			{
@@ -263,9 +268,9 @@ try
 				{
 					$funcName = $Item.BaseName
 					$shouldExport = $ExportAll -or $true
-					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName))
 					{$shouldExport = $script:FunctionExportTable[$funcName]}
-					if ($shouldExport) 
+					if ($shouldExport)
 					{Export-ModuleMember -Function $funcName -ErrorAction Stop}
 				}
 			}
@@ -274,7 +279,7 @@ try
 		{
 			Publish-MyEnvironment -Option 'MacOS'
 			$MacFunctions = Get-ChildItem (Join-Path $ModuleScriptRoot -ChildPath 'FunctionsMacOS\*.ps1') |
-			Where-Object {$_.Name -inotmatch $Exclude}
+				Where-Object {$_.Name -inotmatch $Exclude}
 
 			foreach ($Item in $MacFunctions)
 			{
@@ -290,9 +295,9 @@ try
 				{
 					$funcName = $Item.BaseName
 					$shouldExport = $ExportAll -or $true
-					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName)) 
+					if (-not $ExportAll -and $script:FunctionExportTable -and $script:FunctionExportTable.ContainsKey($funcName))
 					{$shouldExport = $script:FunctionExportTable[$funcName]}
-					if ($shouldExport) 
+					if ($shouldExport)
 					{Export-ModuleMember -Function $funcName -ErrorAction Stop}
 				}
 			}

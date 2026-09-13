@@ -1,4 +1,4 @@
-﻿function Update-DnsRootHints
+﻿function Update-DnsRootHintsFile
 {
 	<#
 		.SYNOPSIS
@@ -19,9 +19,11 @@
 		Re-fetch named.root before saving instead of using the verified set captured at import.
 
 		.EXAMPLE
-		Update-DnsRootHints
+		Update-DnsRootHintsFile
 		Saves the verified root hints from this session to the protected baseline (one UAC prompt).
 	#>
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+		Justification = 'Persists the verified root hints to the protected baseline - the verb is the purpose, and declining the UAC prompt is already handled as a non-error no-op.')]
 	[CmdletBinding()]
 	param(
 		[Switch]$Refresh

@@ -1,15 +1,48 @@
 # DnsTools Changelog
 
+## v0.7
+
+### Breaking changes
+PSScriptAnalyzer cleanup pass (see the repo's `_PlanningDocs\_Repo\2026-09-12_PSSA-Cleanup-Plan.md`).
+Zero external usage confirmed (public repo, 0 stars/forks/subscribers/releases) - hard renames, no
+back-compat aliases:
+
+- `Update-DnsRootHints` -> `Update-DnsRootHintsFile`
+- `Get-DnssecTrustAnchors` -> `Get-DnssecTrustAnchorStore`
+- `Import-DnssecTrustAnchors` -> `Import-DnssecTrustAnchorFile`
+- `Update-DnssecTrustAnchors` -> `Update-DnssecTrustAnchorFile`
+- `Initialize-DnssecTrustAnchors` -> `Initialize-DnssecTrustAnchorFile`
+- `ConvertFrom-DnsWireBytes` -> `ConvertFrom-DnsWireBuffer`
+- `ConvertTo-DnsWireBytes` -> `ConvertTo-DnsWireBuffer`
+- `Get-DnsToolsTypes` -> `Get-DnsToolsType`
+- Internal-only: `Initialize-Folders` -> `Initialize-Folder`, `Publish-Variables` -> `Publish-Variable`
+
+### Removed
+- `Helpers\TestClassinFunc.ps1` (dead scratch content - hardcoded wrong path, self-commented-out call
+  site, zero references).
+
+### Fixed
+- Added `PSAvoidTrailingWhitespace` stripping to every file via the shared formatter (48 files).
+- Added a `PSScriptAnalyzerSettings.psd1` excluding parser-noise rules (`TypeNotFound`,
+  `MemberAlreadyDefined`, `AmbiguousTypeReference`) and the deliberate `PSAvoidUsingWriteHost` choice.
+- Added/corrected `[OutputType(...)]` on `Get-Psd1Data`, `ConvertTo-ReverseDnsName`,
+  `Resolve-NameserverAddress`.
+- Added inline `SuppressMessageAttribute` justifications for `PSAvoidUsingEmptyCatchBlock`
+  (`Write-Trace`), `PSUseShouldProcessForStateChangingFunctions` (`New-DnsQueryPacket`,
+  `Update-DnsRootHintsFile`, and the fixture builders in `Helpers\Generate-Fixtures.ps1`), and two
+  rule false positives (`PSUseSingularNouns` on `Test-DnssecNsec3Nodata`, `PSUseOutputTypeCorrectly`
+  on `Resolve-NameserverAddress`).
+
 ## v0.6
 
 ### Changes
 - Added explicit `FunctionsToExport` to the manifest so the module autoloads on first command use (no manual `Import-Module`).
-- Added a 30-second timeout to the IANA trust-anchor and root-hints web requests (`Update-DnssecTrustAnchors`, `Get-RootHintsObject`) so a hung download cannot block import/refresh indefinitely.
+- Added a 30-second timeout to the IANA trust-anchor and root-hints web requests (`Update-DnssecTrustAnchorFile`, `Get-RootHintsObject`) so a hung download cannot block import/refresh indefinitely.
 - Declared `PowerShellVersion = '5.0'` in the manifest to match the module's `#requires`.
 
 ### Fixed
 - `Invoke-RootHintsBaselineOffer` (an internal module-init helper, auto-invoked at import) is no longer exported as a public command; it is marked internal in the export table so it cannot be re-triggered by hand.
-- Reconciled the manifest `FunctionsToExport` with the runtime export table (`Update-DnsRootHints` and `Invoke-RootHintsBaselineOffer` now have explicit table entries).
+- Reconciled the manifest `FunctionsToExport` with the runtime export table (`Update-DnsRootHintsFile` and `Invoke-RootHintsBaselineOffer` now have explicit table entries).
 - Fixed the placeholder `ProjectUri` (now points at the real repository) and stray trailing whitespace in the `Tags` array.
 
 ## v0.5.2
@@ -25,7 +58,7 @@
 - Root hints stay current: the baseline is refreshed at deploy time, and when a live verified fetch differs from the baseline the module offers to persist it (a timed prompt in an interactive console, a one-line notice otherwise) - declining or non-interactive use is never an error
 
 ### New Commands
-- `Update-DnsRootHints` - persist the verified root hints to the protected baseline (elevates once; `-Refresh` re-fetches `named.root` first)
+- `Update-DnsRootHintsFile` - persist the verified root hints to the protected baseline (elevates once; `-Refresh` re-fetches `named.root` first)
 
 ---
 

@@ -22,6 +22,8 @@
 	.EXAMPLE
 		If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
 	#>
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '',
+		Justification = 'Best-effort trace-log write - a diagnostic write must never be able to fail the real operation it is recording (same convention as this repo''s other Write-*Log helpers).')]
 	param(
 		[string]$Message,
 		[System.Management.Automation.CallStackFrame[]]$CallStack

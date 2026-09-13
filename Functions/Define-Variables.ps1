@@ -107,12 +107,12 @@
 				Helpers\Get-RootHints.ps1
 
 		Trust anchors are initialized from:
-				Initialize-DnssecTrustAnchors.ps1
+				Initialize-DnssecTrustAnchorFile.ps1
 
 		Users may override trust anchors using:
 				Add-DnssecTrustAnchor
-				Import-DnssecTrustAnchors
-				Update-DnssecTrustAnchors
+				Import-DnssecTrustAnchorFile
+				Update-DnssecTrustAnchorFile
 
 		Trust anchors are stored in module-scope variables and used by:
 				Resolve-Dnssec
@@ -177,226 +177,226 @@
 
 $script:FunctionExportTable = @{
 
-		# -------------------------------------------------------------------------
-		# PUBLIC DNS RESOLUTION FUNCTIONS
-		# -------------------------------------------------------------------------
+	# -------------------------------------------------------------------------
+	# PUBLIC DNS RESOLUTION FUNCTIONS
+	# -------------------------------------------------------------------------
 
-		'Resolve-DnsIterative' = $true
-				# Performs full iterative DNS resolution from the root downward.
-				# Uses: RootServerAddresses, QtypeMap, DnsClassMap.
-				# Public entry point for non-DNSSEC resolution.
+	'Resolve-DnsIterative' = $true
+	# Performs full iterative DNS resolution from the root downward.
+	# Uses: RootServerAddresses, QtypeMap, DnsClassMap.
+	# Public entry point for non-DNSSEC resolution.
 
-		'Resolve-Dnssec' = $true
-				# Performs DNSSEC-aware resolution.
-				# Validates signatures, DS/DNSKEY chains, and negative proofs.
-				# Uses: Resolve-DnsIterative, Test-DnssecValidation, RRSIG/NSEC/NSEC3 logic.
+	'Resolve-Dnssec' = $true
+	# Performs DNSSEC-aware resolution.
+	# Validates signatures, DS/DNSKEY chains, and negative proofs.
+	# Uses: Resolve-DnsIterative, Test-DnssecValidation, RRSIG/NSEC/NSEC3 logic.
 
-		'Resolve-DnssecChain' = $true
-				# Returns the full DNSSEC chain of trust for a name.
-				# Useful for debugging and forensic analysis.
-				# Uses: DnssecAlgorithmMap, DnssecDigestMap, TypeCoveredMap.
+	'Resolve-DnssecChain' = $true
+	# Returns the full DNSSEC chain of trust for a name.
+	# Useful for debugging and forensic analysis.
+	# Uses: DnssecAlgorithmMap, DnssecDigestMap, TypeCoveredMap.
 
-		'Resolve-DnssecName' = $true
-				# High-level wrapper for resolving a single name with DNSSEC validation.
-				# Combines resolution + chain validation + formatting.
+	'Resolve-DnssecName' = $true
+	# High-level wrapper for resolving a single name with DNSSEC validation.
+	# Combines resolution + chain validation + formatting.
 
-		'Test-DnssecValidation' = $true
-				# Validates an entire DNSSEC response set.
-				# Uses: Test-DnssecRrsig, Test-DnssecDsForDnskey, Test-DnssecAnchoredDnskey.
+	'Test-DnssecValidation' = $true
+	# Validates an entire DNSSEC response set.
+	# Uses: Test-DnssecRrsig, Test-DnssecDsForDnskey, Test-DnssecAnchoredDnskey.
 
-		'Test-DnssecName' = $true
-				# Validates DNSSEC for a specific name.
-				# Useful for automated testing and CI pipelines.
+	'Test-DnssecName' = $true
+	# Validates DNSSEC for a specific name.
+	# Useful for automated testing and CI pipelines.
 
-		'Update-DnssecTrustAnchors' = $true
-				# Refreshes trust anchors (e.g., root KSK rollover).
-				# Uses: TrustAnchorsInitialized.
+	'Update-DnssecTrustAnchorFile' = $true
+	# Refreshes trust anchors (e.g., root KSK rollover).
+	# Uses: TrustAnchorsInitialized.
 
-		'Get-DnssecTrustAnchors' = $true
-				# Returns currently loaded trust anchors.
+	'Get-DnssecTrustAnchorStore' = $true
+	# Returns currently loaded trust anchors.
 
-		'Add-DnssecTrustAnchor' = $true
-				# Adds a new trust anchor (DS or DNSKEY).
-				# Supports custom validation environments.
+	'Add-DnssecTrustAnchor' = $true
+	# Adds a new trust anchor (DS or DNSKEY).
+	# Supports custom validation environments.
 
-		'Import-DnssecTrustAnchors' = $true
-				# Imports trust anchors from file or external source.
+	'Import-DnssecTrustAnchorFile' = $true
+	# Imports trust anchors from file or external source.
 
 
-		# -------------------------------------------------------------------------
-		# PUBLIC ROOT HINTS MANAGEMENT
-		# -------------------------------------------------------------------------
+	# -------------------------------------------------------------------------
+	# PUBLIC ROOT HINTS MANAGEMENT
+	# -------------------------------------------------------------------------
 
-		'Update-DnsRootHints' = $true
-				# Persists the verified root hints captured this session to the protected baseline (elevates once).
+	'Update-DnsRootHintsFile' = $true
+	# Persists the verified root hints captured this session to the protected baseline (elevates once).
 
 
-		# -------------------------------------------------------------------------
-		# PUBLIC TYPE/CLASS/ALGORITHM CONVERSION UTILITIES
-		# -------------------------------------------------------------------------
+	# -------------------------------------------------------------------------
+	# PUBLIC TYPE/CLASS/ALGORITHM CONVERSION UTILITIES
+	# -------------------------------------------------------------------------
 
-		'ConvertTo-DnsTypeCode' = $true
-				# Converts RR type name -> numeric code using QtypeMap.
+	'ConvertTo-DnsTypeCode' = $true
+	# Converts RR type name -> numeric code using QtypeMap.
 
-		'ConvertFrom-DnsTypeCode' = $true
-				# Converts numeric RR type code -> name using QtypeMap.
+	'ConvertFrom-DnsTypeCode' = $true
+	# Converts numeric RR type code -> name using QtypeMap.
 
-		'Format-DnsTypeName' = $true
-				# Normalizes RR type names for display and logging.
+	'Format-DnsTypeName' = $true
+	# Normalizes RR type names for display and logging.
 
-		'ConvertTo-DnsClassCode' = $true
-				# Converts DNS class name -> numeric code.
+	'ConvertTo-DnsClassCode' = $true
+	# Converts DNS class name -> numeric code.
 
-		'ConvertFrom-DnsClassCode' = $true
-				# Converts numeric DNS class code -> name.
+	'ConvertFrom-DnsClassCode' = $true
+	# Converts numeric DNS class code -> name.
 
-		'Format-DnsClassName' = $true
-				# Normalizes class names for display.
+	'Format-DnsClassName' = $true
+	# Normalizes class names for display.
 
-		'ConvertTo-DnssecAlgorithmCode' = $true
-				# Converts DNSSEC algorithm name -> numeric code using DnssecAlgorithmMap.
+	'ConvertTo-DnssecAlgorithmCode' = $true
+	# Converts DNSSEC algorithm name -> numeric code using DnssecAlgorithmMap.
 
-		'ConvertFrom-DnssecAlgorithmCode' = $true
-				# Converts numeric DNSSEC algorithm code -> name.
+	'ConvertFrom-DnssecAlgorithmCode' = $true
+	# Converts numeric DNSSEC algorithm code -> name.
 
-		'Format-DnssecAlgorithmName' = $true
-				# Normalizes algorithm names for display.
+	'Format-DnssecAlgorithmName' = $true
+	# Normalizes algorithm names for display.
 
 
-		# -------------------------------------------------------------------------
-		# PUBLIC WIRE-FORMAT UTILITIES
-		# -------------------------------------------------------------------------
+	# -------------------------------------------------------------------------
+	# PUBLIC WIRE-FORMAT UTILITIES
+	# -------------------------------------------------------------------------
 
-		'ConvertFrom-DnsPacket' = $true
-				# Parses raw DNS wire bytes into structured objects.
-				# Uses: ConvertFrom-DnsHeader, ConvertFrom-DnsQuestion, ConvertFrom-DnsWireBytes.
+	'ConvertFrom-DnsPacket' = $true
+	# Parses raw DNS wire bytes into structured objects.
+	# Uses: ConvertFrom-DnsHeader, ConvertFrom-DnsQuestion, ConvertFrom-DnsWireBuffer.
 
-		'New-DnsQueryPacket' = $true
-				# Constructs a DNS query packet in canonical wire format.
+	'New-DnsQueryPacket' = $true
+	# Constructs a DNS query packet in canonical wire format.
 
-		'Invoke-DnsUdpQuery' = $true
-				# Sends a DNS query via UDP with transport safety checks.
-				# Uses: Invoke-DnsTransportSafe.
+	'Invoke-DnsUdpQuery' = $true
+	# Sends a DNS query via UDP with transport safety checks.
+	# Uses: Invoke-DnsTransportSafe.
 
 
-		# -------------------------------------------------------------------------
-		# INTERNAL FUNCTIONS - NOT EXPORTED
-		# -------------------------------------------------------------------------
-		# These functions implement the core mechanics of DNSSEC, canonicalization,
-		# wire-format parsing, and transport safety. They are intentionally internal
-		# to prevent accidental misuse and to maintain a clean public API.
+	# -------------------------------------------------------------------------
+	# INTERNAL FUNCTIONS - NOT EXPORTED
+	# -------------------------------------------------------------------------
+	# These functions implement the core mechanics of DNSSEC, canonicalization,
+	# wire-format parsing, and transport safety. They are intentionally internal
+	# to prevent accidental misuse and to maintain a clean public API.
 
-		'Write-Trace' = $false
-				# Internal tracing/logging helper.
+	'Write-Trace' = $false
+	# Internal tracing/logging helper.
 
-		'Resolve-NameserverAddress' = $false
-				# Normalizes nameserver input (IPv4/IPv6/hostname).
+	'Resolve-NameserverAddress' = $false
+	# Normalizes nameserver input (IPv4/IPv6/hostname).
 
-		'Invoke-DnsTransportSafe' = $false
-				# Wraps UDP transport with retry and timeout logic.
+	'Invoke-DnsTransportSafe' = $false
+	# Wraps UDP transport with retry and timeout logic.
 
-		'ConvertFrom-DnsWireBytes' = $false
-				# Converts raw wire bytes into structured RR objects.
+	'ConvertFrom-DnsWireBuffer' = $false
+	# Converts raw wire bytes into structured RR objects.
 
-		'ConvertTo-DnsWireBytes' = $false
-				# Serializes DNS objects into canonical wire format.
+	'ConvertTo-DnsWireBuffer' = $false
+	# Serializes DNS objects into canonical wire format.
 
-		'ConvertTo-HexString' = $false
-				# Utility for hex encoding.
+	'ConvertTo-HexString' = $false
+	# Utility for hex encoding.
 
-		'ConvertFrom-DnsHeader' = $false
-				# Parses DNS header fields.
+	'ConvertFrom-DnsHeader' = $false
+	# Parses DNS header fields.
 
-		'ConvertFrom-DnsQuestion' = $false
-				# Parses DNS question section.
+	'ConvertFrom-DnsQuestion' = $false
+	# Parses DNS question section.
 
-		'Get-RecordTypeA' = $false
-				# Internal handler for A records.
+	'Get-RecordTypeA' = $false
+	# Internal handler for A records.
 
-		'Get-RecordTypeAAAA' = $false
-				# Internal handler for AAAA records.
+	'Get-RecordTypeAAAA' = $false
+	# Internal handler for AAAA records.
 
-		'Format-DnsIterativeResult' = $false
-				# Formats iterative resolution output.
+	'Format-DnsIterativeResult' = $false
+	# Formats iterative resolution output.
 
-		'Format-DnsResponse' = $false
-				# Formats DNS response objects.
+	'Format-DnsResponse' = $false
+	# Formats DNS response objects.
 
-		'Format-DnssecResult' = $false
-				# Formats DNSSEC validation results.
+	'Format-DnssecResult' = $false
+	# Formats DNSSEC validation results.
 
-		'Initialize-DnssecTrustAnchors' = $false
-				# Loads trust anchors at module initialization.
+	'Initialize-DnssecTrustAnchorFile' = $false
+	# Loads trust anchors at module initialization.
 
-		'Invoke-RootHintsBaselineOffer' = $false
-				# Module-init helper: offers to persist verified root hints when they differ from the baseline.
-				# Auto-invoked once at import; NOT public (exporting it would let users re-trigger the elevating offer).
+	'Invoke-RootHintsBaselineOffer' = $false
+	# Module-init helper: offers to persist verified root hints when they differ from the baseline.
+	# Auto-invoked once at import; NOT public (exporting it would let users re-trigger the elevating offer).
 
 
-		# -------------------------------------------------------------------------
-		# INTERNAL DNSSEC FUNCTIONS - NOT EXPORTED
-		# -------------------------------------------------------------------------
-		# These functions implement the core DNSSEC validation pipeline.
+	# -------------------------------------------------------------------------
+	# INTERNAL DNSSEC FUNCTIONS - NOT EXPORTED
+	# -------------------------------------------------------------------------
+	# These functions implement the core DNSSEC validation pipeline.
 
-		'Get-DnssecCanonicalNameWire' = $false
-				# Canonicalizes DNS names for signature validation.
+	'Get-DnssecCanonicalNameWire' = $false
+	# Canonicalizes DNS names for signature validation.
 
-		'Get-DnssecCanonicalRrWire' = $false
-				# Canonicalizes RR wire format for RRSIG validation.
+	'Get-DnssecCanonicalRrWire' = $false
+	# Canonicalizes RR wire format for RRSIG validation.
 
-		'Get-DnssecCanonicalRrsetData' = $false
-				# Extracts canonical RRset data for signature hashing.
+	'Get-DnssecCanonicalRrsetData' = $false
+	# Extracts canonical RRset data for signature hashing.
 
-		'Get-DnssecSignedData' = $false
-				# Builds the signed data blob for RRSIG verification.
+	'Get-DnssecSignedData' = $false
+	# Builds the signed data blob for RRSIG verification.
 
-		'Get-DnssecKeyDigest' = $false
-				# Computes DS digest from DNSKEY.
+	'Get-DnssecKeyDigest' = $false
+	# Computes DS digest from DNSKEY.
 
-		'Get-DnssecKeyDigestHex' = $false
-				# Hex-encoded DS digest.
+	'Get-DnssecKeyDigestHex' = $false
+	# Hex-encoded DS digest.
 
-		'Get-DnssecNsec3Hash' = $false
-				# Computes NSEC3 hash for closest-encloser logic.
+	'Get-DnssecNsec3Hash' = $false
+	# Computes NSEC3 hash for closest-encloser logic.
 
-		'Get-DnssecSigningKey' = $false
-				# Selects the correct DNSKEY for an RRSIG.
+	'Get-DnssecSigningKey' = $false
+	# Selects the correct DNSKEY for an RRSIG.
 
-		'Test-DnssecTimeWindow' = $false
-				# Validates RRSIG inception/expiration windows.
+	'Test-DnssecTimeWindow' = $false
+	# Validates RRSIG inception/expiration windows.
 
-		'Test-DnssecRrsig' = $false
-				# Validates RRSIG over an RRset.
+	'Test-DnssecRrsig' = $false
+	# Validates RRSIG over an RRset.
 
-		'Test-DnssecDsForDnskey' = $false
-				# Validates DS <-> DNSKEY relationship.
+	'Test-DnssecDsForDnskey' = $false
+	# Validates DS <-> DNSKEY relationship.
 
-		'Test-DnssecChain' = $false
-				# Validates full DNSSEC chain of trust.
+	'Test-DnssecChain' = $false
+	# Validates full DNSSEC chain of trust.
 
-		'Test-DnssecNsec3Nodata' = $false
-				# Validates NSEC3-based NODATA proofs.
+	'Test-DnssecNsec3Nodata' = $false
+	# Validates NSEC3-based NODATA proofs.
 
-		'Test-DnssecNsec3Nxdomain' = $false
-				# Validates NSEC3-based NXDOMAIN proofs.
+	'Test-DnssecNsec3Nxdomain' = $false
+	# Validates NSEC3-based NXDOMAIN proofs.
 
-		'Test-DnssecNsec3OptOut' = $false
-				# Validates NSEC3 Opt-Out behavior.
+	'Test-DnssecNsec3OptOut' = $false
+	# Validates NSEC3 Opt-Out behavior.
 
-		'Find-DnssecNsec3ClosestEncloser' = $false
-				# Finds closest encloser for NSEC3 proofs.
+	'Find-DnssecNsec3ClosestEncloser' = $false
+	# Finds closest encloser for NSEC3 proofs.
 
-		'Find-DnssecNsec3NextCloser' = $false
-				# Computes next-closer name for NSEC3 proofs.
+	'Find-DnssecNsec3NextCloser' = $false
+	# Computes next-closer name for NSEC3 proofs.
 
-		'Test-DnssecAnchoredDnskey' = $false
-				# Validates DNSKEY against trust anchors.
+	'Test-DnssecAnchoredDnskey' = $false
+	# Validates DNSKEY against trust anchors.
 
-		'Test-DnssecSignature' = $false
-				# Performs cryptographic signature validation.
+	'Test-DnssecSignature' = $false
+	# Performs cryptographic signature validation.
 
-		'ConvertTo-ReverseDnsName' = $false
-				# Converts IP addresses to reverse-DNS names.
+	'ConvertTo-ReverseDnsName' = $false
+	# Converts IP addresses to reverse-DNS names.
 }
 # =============================================================================
 # VARIABLE DEFINITIONS AND MODULE-LEVEL STATE
@@ -426,25 +426,25 @@ $script:FunctionExportTable = @{
 # -------------------------------------------------------------------------
 
 $MyVars = [Ordered]@{
-		N00ConstantVars = @{
-				VOConstant = @{
-						Value  = 'Constant'
-						Scope  = 'Script'
-						Option = 'ReadOnly'
-				}
-				VSScript = @{
-						Value  = 'Script'
-						Scope  = 'Script'
-						Option = 'ReadOnly'
-				}
-				VOReadOnly = @{
-						Value  = 'ReadOnly'
-						Scope  = 'Script'
-						Option = 'ReadOnly'
-				}
+	N00ConstantVars = @{
+		VOConstant = @{
+			Value  = 'Constant'
+			Scope  = 'Script'
+			Option = 'ReadOnly'
 		}
+		VSScript = @{
+			Value  = 'Script'
+			Scope  = 'Script'
+			Option = 'ReadOnly'
+		}
+		VOReadOnly = @{
+			Value  = 'ReadOnly'
+			Scope  = 'Script'
+			Option = 'ReadOnly'
+		}
+	}
 }
-Publish-Variables -Variables $MyVars
+Publish-Variable -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -458,40 +458,40 @@ Publish-Variables -Variables $MyVars
 # -------------------------------------------------------------------------
 
 $MyVars = [Ordered]@{
-		N00ConstantVars = @{
-				VInfoOn = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VOReadOnly
-						Use    = 'Define Variables Information'
-				}
-				FInfoOn = @{
-						Value  = $false
-						Scope  = $VSScript
-						Option = $VOReadOnly
-						Use    = 'Define Common Functions Information'
-				}
-				FWInfoOn = @{
-						Value  = $false
-						Scope  = $VSScript
-						Option = $VOReadOnly
-						Use    = 'Define Windows Functions Information'
-				}
-				FLInfoOn = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VOReadOnly
-						Use    = 'Define Linux Functions Information'
-				}
-				FMInfoOn = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VOReadOnly
-						Use    = 'Define MacOS Functions Information'
-				}
+	N00ConstantVars = @{
+		VInfoOn = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VOReadOnly
+			Use    = 'Define Variables Information'
 		}
+		FInfoOn = @{
+			Value  = $false
+			Scope  = $VSScript
+			Option = $VOReadOnly
+			Use    = 'Define Common Functions Information'
+		}
+		FWInfoOn = @{
+			Value  = $false
+			Scope  = $VSScript
+			Option = $VOReadOnly
+			Use    = 'Define Windows Functions Information'
+		}
+		FLInfoOn = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VOReadOnly
+			Use    = 'Define Linux Functions Information'
+		}
+		FMInfoOn = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VOReadOnly
+			Use    = 'Define MacOS Functions Information'
+		}
+	}
 }
-Publish-Variables -Variables $MyVars
+Publish-Variable -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -502,40 +502,40 @@ Publish-Variables -Variables $MyVars
 # -------------------------------------------------------------------------
 
 $MyVars = @{
-		N01ReadOnlyVars = @{
-				VSGlobal = @{
-						Value  = 'Global'
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				VSUsing = @{
-						Value  = 'Using'
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				VSWorkFlow = @{
-						Value  = 'WorkFlow'
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				VOAllScope = @{
-						Value  = 'AllScope'
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				VOPrivate = @{
-						Value  = 'Private'
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				VONone = @{
-						Value  = 'None'
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
+	N01ReadOnlyVars = @{
+		VSGlobal = @{
+			Value  = 'Global'
+			Scope  = $VSScript
+			Option = $VOReadOnly
 		}
+		VSUsing = @{
+			Value  = 'Using'
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		VSWorkFlow = @{
+			Value  = 'WorkFlow'
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		VOAllScope = @{
+			Value  = 'AllScope'
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		VOPrivate = @{
+			Value  = 'Private'
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		VONone = @{
+			Value  = 'None'
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+	}
 }
-Publish-Variables -Variables $MyVars
+Publish-Variable -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -546,78 +546,78 @@ Publish-Variables -Variables $MyVars
 # -------------------------------------------------------------------------
 
 $ML = @{
-		Name = $ModuleName
-		Path = $ModuleScriptRoot
+	Name = $ModuleName
+	Path = $ModuleScriptRoot
 }
 
 $MyVars = @{
-		N02ReadOnlyVars = @{
-				ModuleVersion = @{
-						Value  = $PSD1Data.ModuleVersion
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				MajorPSVersion = @{
-						Value  = [String]($PSVersionTable.PSVersion.Major)
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				ModuleLoaded = @{
-						Value  = $ML
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				Administrator = @{
-						Value  = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				Interactive = @{
-						Value  = [Environment]::UserInteractive
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				MyCulture = @{
-						Value  = [cultureinfo]::GetCultures('Allcultures') |
-										 Where-Object -Property name -imatch (Get-Culture).name
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				StrCRLF = @{
-						Value  = "`r`n"
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				StrCR = @{
-						Value  = "`r"
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				StrLF = @{
-						Value  = "`n"
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				DayOfWeek = @{
-						Value  = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ([Ordered]@{
-								Monday    = 1; Tuesday   = 2; Wednesday = 3; Thursday  = 4
-								Friday    = 5; Saturday  = 6; Sunday    = 7
-						})
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				MonthOfYear = @{
-						Value  = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ( [Ordered]@{
-								January   = 1; February  = 2; March     = 3; April     = 4
-								May       = 5; June      = 6; July      = 7; August    = 8
-								September = 9; October   = 10; November = 11; December = 12
-						})
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
+	N02ReadOnlyVars = @{
+		ModuleVersion = @{
+			Value  = $PSD1Data.ModuleVersion
+			Scope  = $VSScript
+			Option = $VOReadOnly
 		}
+		MajorPSVersion = @{
+			Value  = [String]($PSVersionTable.PSVersion.Major)
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		ModuleLoaded = @{
+			Value  = $ML
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		Administrator = @{
+			Value  = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		Interactive = @{
+			Value  = [Environment]::UserInteractive
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		MyCulture = @{
+			Value  = [cultureinfo]::GetCultures('Allcultures') |
+				Where-Object -Property name -imatch (Get-Culture).name
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		StrCRLF = @{
+			Value  = "`r`n"
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		StrCR = @{
+			Value  = "`r"
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		StrLF = @{
+			Value  = "`n"
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		DayOfWeek = @{
+			Value  = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ([Ordered]@{
+					Monday    = 1; Tuesday   = 2; Wednesday = 3; Thursday  = 4
+					Friday    = 5; Saturday  = 6; Sunday    = 7
+				})
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		MonthOfYear = @{
+			Value  = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ( [Ordered]@{
+					January   = 1; February  = 2; March     = 3; April     = 4
+					May       = 5; June      = 6; July      = 7; August    = 8
+					September = 9; October   = 10; November = 11; December = 12
+				})
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+	}
 }
-Publish-Variables -Variables $MyVars
+Publish-Variable -Variables $MyVars
 
 
 # -------------------------------------------------------------------------
@@ -628,145 +628,145 @@ Publish-Variables -Variables $MyVars
 # -------------------------------------------------------------------------
 
 $MyVars = @{
-		N03OtherVars = @{
-				LogFilePath = @{
-						Value  = $Null
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				LogLevel = @{
-						Value  = 0
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				LogLevelSave = @{
-						Value  = 0
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				MaxLogLevel = @{
-						Value  = 5
-						Scope  = $VSScript
-						Option = $VOReadOnly
-				}
-				LogLinePad = @{
-						Value  = 5
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				KeepCopies = @{
-						Value  = 5
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FileSize = @{
-						Value  = 100KB
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FileNumber = @{
-						Value  = 10
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FileDays = @{
-						Value  = 10
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				Console = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				EnCoding = @{
-						Value  = 'UTF8'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				WindowHeight = @{
-						Value  = 0
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				WindowWidth = @{
-						Value  = 0
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				IsConsole = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				MyInitialCallStack = @{
-						Value  = $Null
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				MyInitialCallingScript = @{
-						Value  = $Null
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FTraceInternalCall = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FTraceAllCalls = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FTLogFilPath = @{
-						Value  = $Null
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				FTrace = @{
-						Value  = $False
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrContinue = @{
-						Value  = 'Continue'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrSilentlyContinue = @{
-						Value  = 'SilentlyContinue'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrInquire = @{
-						Value  = 'Inquire'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrStop = @{
-						Value  = 'Stop'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrVerbose = @{
-						Value  = 'Verbose'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrExtPS1 = @{
-						Value  = '.ps1'
-						Scope  = $VSScript
-						Option = $VONone
-				}
-				StrExtZip = @{
-						Value  = '.zip'
-						Scope  = $VSScript
-						Option = $VONone
-				}
+	N03OtherVars = @{
+		LogFilePath = @{
+			Value  = $Null
+			Scope  = $VSScript
+			Option = $VONone
 		}
+		LogLevel = @{
+			Value  = 0
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		LogLevelSave = @{
+			Value  = 0
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		MaxLogLevel = @{
+			Value  = 5
+			Scope  = $VSScript
+			Option = $VOReadOnly
+		}
+		LogLinePad = @{
+			Value  = 5
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		KeepCopies = @{
+			Value  = 5
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FileSize = @{
+			Value  = 100KB
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FileNumber = @{
+			Value  = 10
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FileDays = @{
+			Value  = 10
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		Console = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		EnCoding = @{
+			Value  = 'UTF8'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		WindowHeight = @{
+			Value  = 0
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		WindowWidth = @{
+			Value  = 0
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		IsConsole = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		MyInitialCallStack = @{
+			Value  = $Null
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		MyInitialCallingScript = @{
+			Value  = $Null
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FTraceInternalCall = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FTraceAllCalls = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FTLogFilPath = @{
+			Value  = $Null
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		FTrace = @{
+			Value  = $False
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrContinue = @{
+			Value  = 'Continue'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrSilentlyContinue = @{
+			Value  = 'SilentlyContinue'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrInquire = @{
+			Value  = 'Inquire'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrStop = @{
+			Value  = 'Stop'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrVerbose = @{
+			Value  = 'Verbose'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrExtPS1 = @{
+			Value  = '.ps1'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+		StrExtZip = @{
+			Value  = '.zip'
+			Scope  = $VSScript
+			Option = $VONone
+		}
+	}
 }
-Publish-Variables -Variables $MyVars
+Publish-Variable -Variables $MyVars
 # =============================================================================
 # DNS TYPE / CLASS / ALGORITHM / OPTION MAPS
 # =============================================================================
@@ -794,7 +794,7 @@ Publish-Variables -Variables $MyVars
 # Used by Resolve-DnsIterative and Resolve-Dnssec.
 # -------------------------------------------------------------------------
 $MyVars = @{
-		N07DNS = @{
+	N07DNS = @{
 
 		# -------------------------------------------------------------------------
 		# QTYPE MAP - DNS RR TYPE <-> CODE
@@ -862,7 +862,7 @@ $MyVars = @{
 					ANY        = 255   # Request all types
 					URI        = 256   # Uniform Resource Identifier
 					CAA        = 257
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -885,7 +885,7 @@ $MyVars = @{
 					HS   = 4
 					NONE = 254
 					ANY  = 255
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -922,7 +922,7 @@ $MyVars = @{
 					INDIRECT           = 252
 					PRIVATEDNS         = 253
 					PRIVATEOID         = 254
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -942,7 +942,7 @@ $MyVars = @{
 					SHA256 = 2   # Recommended.
 					GOST   = 3   # Rare.
 					SHA384 = 4   # Recommended.
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -976,7 +976,7 @@ $MyVars = @{
 					BADALG           = 21
 					BADTRUNC         = 22
 					BADCOOKIE        = 23
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1033,7 +1033,7 @@ $MyVars = @{
 					ANY        = 255
 					URI        = 256
 					CAA        = 257
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1067,7 +1067,7 @@ $MyVars = @{
 					15    = 'EdnsClientTag'
 					16    = 'EdnsServerTag'
 					26946 = 'DeviceID'
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1108,7 +1108,7 @@ $MyVars = @{
 					STATUS = 2
 					NOTIFY = 4
 					UPDATE = 5
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1152,7 +1152,7 @@ $MyVars = @{
 					PKIX_EE = 1  # Service certificate constraint
 					DANE_TA = 2  # Trust anchor assertion
 					DANE_EE = 3  # Domain-issued certificate
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1166,7 +1166,7 @@ $MyVars = @{
 			Value = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ([ordered]@{
 					FullCert = 0  # Full certificate
 					SPKI     = 1  # SubjectPublicKeyInfo
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1181,7 +1181,7 @@ $MyVars = @{
 					Exact  = 0
 					SHA256 = 1
 					SHA512 = 2
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1198,7 +1198,7 @@ $MyVars = @{
 					ECDSA   = 3
 					ED25519 = 4
 					ED448   = 6
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
@@ -1212,13 +1212,13 @@ $MyVars = @{
 			Value = . (Join-Path -Path $ModuleScriptRoot -ChildPath 'Helpers\Add-ReverseMapEntries.ps1') -Map ([ordered]@{
 					SHA1   = 1   # Deprecated - SHA-1 collision risk.
 					SHA256 = 2   # Recommended.
-			})
+				})
 			Scope  = $VSScript
 			Option = $VONone
 		}
 	}
 }
-Publish-Variables -Variables $MyVars
+Publish-Variable -Variables $MyVars
 
 # =============================================================================
 # FINAL INITIALIZATION BLOCK
@@ -1243,7 +1243,7 @@ Publish-Variables -Variables $MyVars
 # =============================================================================
 
 $MyVars = @{
-		N09Finalise = @{
+	N09Finalise = @{
 		# -------------------------------------------------------------------------
 		# INITIALIZE ROOT HINTS
 		# -------------------------------------------------------------------------
@@ -1265,7 +1265,7 @@ $MyVars = @{
 		# INITIALIZE DNSSEC TRUST ANCHORS
 		# -------------------------------------------------------------------------
 		# Trust anchors are loaded from:
-		#   Initialize-DnssecTrustAnchors.ps1
+		#   Initialize-DnssecTrustAnchorFile.ps1
 		#
 		# They are used by:
 		#   - Resolve-Dnssec
@@ -1275,20 +1275,20 @@ $MyVars = @{
 		#
 		# Users may override trust anchors via:
 		#   - Add-DnssecTrustAnchor
-		#   - Import-DnssecTrustAnchors
-		#   - Update-DnssecTrustAnchors
+		#   - Import-DnssecTrustAnchorFile
+		#   - Update-DnssecTrustAnchorFile
 		#
 		# Trust anchors are stored in script-scope variables for deterministic behavior.
 		# -------------------------------------------------------------------------
 
 		TrustAnchorsInitialized = @{
-			Value  = ( . (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-DnssecTrustAnchors.ps1') )
+			Value  = ( . (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-DnssecTrustAnchorFile.ps1') )
 			Scope  = $VSScript
 			Option = $VONone
 		}
 
-}}
-Publish-Variables -Variables $MyVars
+	}}
+Publish-Variable -Variables $MyVars
 
 
 # -------------------------------------------------------------------------

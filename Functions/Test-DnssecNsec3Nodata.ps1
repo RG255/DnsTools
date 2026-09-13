@@ -19,6 +19,8 @@
 	.PARAMETER HashAlgorithm
 		The NSEC3 hash algorithm.
 	#>
+	[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
+		Justification = 'Rule false positive - it treats "Nodata" as the Latin plural of "Nodatum" (same -a/-um heuristic as data/datum); NODATA is the correct DNSSEC term (RFC 5155) and is not a plural in normal English usage.')]
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory)]
@@ -46,13 +48,13 @@
 
 	# 1. Closest Encloser
 	$ce = Find-DnssecNsec3ClosestEncloser `
-	-QueryName $QueryName `
-	-Nsec3Records $Nsec3Records `
-	-HashAlgorithm $HashAlgorithm `
-	-Iterations $Iterations `
-	-salt $salt
+		-QueryName $QueryName `
+		-Nsec3Records $Nsec3Records `
+		-HashAlgorithm $HashAlgorithm `
+		-Iterations $Iterations `
+		-salt $salt
 
-	if (-not $ce) 
+	if (-not $ce)
 	{
 		return [pscustomobject]@{
 			Nodata = $false
@@ -61,7 +63,7 @@
 	}
 
 	# For simple NODATA: CE must be the queried name
-	if ($ce.Name -ne $queryCanon) 
+	if ($ce.Name -ne $queryCanon)
 	{
 		return [pscustomobject]@{
 			Nodata = $false
@@ -73,7 +75,7 @@
 	$bitmap = $ce.Record.Types
 	$typeExists = $bitmap -contains $QueryType
 
-	if ($typeExists) 
+	if ($typeExists)
 	{
 		return [pscustomobject]@{
 			Nodata = $false

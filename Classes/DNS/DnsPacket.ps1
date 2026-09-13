@@ -6,7 +6,7 @@
 	[System.Collections.Generic.List[DnsResourceRecord]] $Additional
 	[DnsOptRecord] $Opt
 
-	DnsPacket() 
+	DnsPacket()
 	{
 		$this.Questions  = [System.Collections.Generic.List[DnsQuestion]]::new()
 		$this.Answers    = [System.Collections.Generic.List[DnsResourceRecord]]::new()
@@ -15,25 +15,25 @@
 		$this.Opt        = $null
 	}
 
-	static [DnsPacket] Parse([byte[]]$packetBytes) 
+	static [DnsPacket] Parse([byte[]]$packetBytes)
 	{
 		$r = [DnsBinaryReader]::new($packetBytes)
 		$pkt = [DnsPacket]::new()
 		$pkt.Header = [DnsHeader]::Parse($r)
 
-		for ($i = 0; $i -lt $pkt.Header.QdCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.QdCount; $i++)
 		{$null = $pkt.Questions.Add([DnsQuestion]::Parse($r))}
 
-		for ($i = 0; $i -lt $pkt.Header.AnCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.AnCount; $i++)
 		{
-			if ($r.Position -ge $r.Buffer.Length) 
+			if ($r.Position -ge $r.Buffer.Length)
 			{throw 'DNS header ANCOUNT exceeds packet length'}
 			$null = $pkt.Answers.Add([DnsResourceRecord]::Parse($r))
 		}
 
-		for ($i = 0; $i -lt $pkt.Header.NsCount; $i++) 
+		for ($i = 0; $i -lt $pkt.Header.NsCount; $i++)
 		{
-			if ($r.Position -ge $r.Buffer.Length) 
+			if ($r.Position -ge $r.Buffer.Length)
 			{throw 'DNS header NSCOUNT exceeds packet length'}
 			$null = $pkt.Authority.Add([DnsResourceRecord]::Parse($r))
 		}

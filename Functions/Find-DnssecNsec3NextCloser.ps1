@@ -44,7 +44,7 @@
 
 	# Filter to real NSEC3 records
 	$records = $Nsec3Records | Where-Object -FilterScript {$_ -is [DnsNsec3Record]}
-	if (-not $records) 
+	if (-not $records)
 	{return $null}
 
 	# Compute next-closer name (the query itself)
@@ -53,14 +53,14 @@
 
 	# Compute its hash
 	$ncHash = Get-DnssecNsec3Hash -name $canon `
-	-Algorithm $HashAlgorithm `
-	-Iterations $Iterations `
-	-salt $salt
+		-Algorithm $HashAlgorithm `
+		-Iterations $Iterations `
+		-salt $salt
 
 	# Convert hash to comparable string
 	$H = $ncHash -join ','
 
-	foreach ($rec in $records) 
+	foreach ($rec in $records)
 	{
 		$a = $rec.OwnerHash -join ','
 		$b = $rec.NextHash  -join ','
@@ -76,16 +76,16 @@
 
 		$aLessB = ($cmpA -lt $cmpB)
 
-		if ($aLessB) 
+		if ($aLessB)
 		{
 			# Normal interval
-			if ($cmpA -lt $cmpH -and $cmpH -lt $cmpB) 
+			if ($cmpA -lt $cmpH -and $cmpH -lt $cmpB)
 			{return $rec}
 		}
-		else 
+		else
 		{
 			# Wrap-around interval
-			if ($cmpH -gt $cmpA -or $cmpH -lt $cmpB) 
+			if ($cmpH -gt $cmpA -or $cmpH -lt $cmpB)
 			{return $rec}
 		}
 	}
