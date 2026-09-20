@@ -20,7 +20,7 @@
 		[string]$Context = 'DNS transport'
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	# EAP=Stop is what makes the catch below actually work. Without it this wrapper caught only
 	# TERMINATING errors, so a cmdlet failing NON-terminatingly inside $Operation slipped past
@@ -40,5 +40,14 @@
 	try
 	{return & $Operation}
 	catch
-	{throw "$Context failed: $($_.Exception.Message)"}
+	{
+		# 2026-09-15: also runs Get-MyError here - this module's first real caller of it. Purely
+		# additive: -PreserveErrors so $Global:Error is untouched for whatever caller catches the
+		# re-thrown exception next, and the return value is discarded ($null =) since the re-thrown
+		# message text below is unchanged - the point is Get-MyError's own automatic inline
+		# function-trace mirroring (see its own .NOTES), which needs a real call site to ever fire
+		# for this module, not a behavior change here.
+		$null = Get-MyError -PreserveErrors
+		throw "$Context failed: $($_.Exception.Message)"
+	}
 }

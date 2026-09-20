@@ -34,7 +34,7 @@
 	)
 
 	begin {
-		If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+		If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 	}
 
 	process {
@@ -187,6 +187,12 @@ function Format-DnsRecord
 		[string]$Section
 	)
 
+	# Deliberately NOT traced (2026-09-15): called once per DNS record inside Format-DnsIterativeResult's
+	# own loop (up to dozens of times per single query) - Format-DnsIterativeResult's own trace stamp
+	# already establishes the operation happened; tracing every record adds volume with no extra
+	# diagnostic value. Same "per-item/stream-processing helper" exemption the trace facility's own plan
+	# documents for DnsBinaryReader's per-byte read methods - see
+	# _PlanningDocs\_Repo\2026-09-13_Function-Trace-Facility-Plan.md, "What gets instrumented".
 	$typeName = Format-DnsTypeName -Type $Record.Type
 	$rdata = $Record.RDataObject
 

@@ -42,7 +42,7 @@
 		[byte[]]$salt
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$queryCanon = $QueryName.ToLower().TrimEnd('.')
 

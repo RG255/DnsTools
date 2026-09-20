@@ -32,57 +32,72 @@
 		[switch]$Trace
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
-	# Convert type name to code if needed
-	$TypeCode = ConvertTo-DnsTypeCode -Type $type
+	# 2026-09-15: whole body wrapped in Try/Catch, same reasoning and same convention as the identical
+	# fix in Resolve-Dnssec.ps1 (see that file's comment) - this function had no error handling anywhere
+	# despite already returning a structured Valid/Reason/Chain object for every controlled failure.
+	try {
 
-	# 1. Load root trust anchor (hard-coded DNSKEY RRset for ".")
-	$rootKeys = Get-RootTrustAnchor
+		# Convert type name to code if needed
+		$TypeCode = ConvertTo-DnsTypeCode -Type $type
 
-	# 2. Walk labels from right to left:
-	#    ".", "com.", "cloudflare.com."
-	$zones = Get-DnssecZonePath -Name $name  # returns [".", "com.", "cloudflare.com."]
+		# 1. Load root trust anchor (hard-coded DNSKEY RRset for ".")
+		$rootKeys = Get-RootTrustAnchor
 
-	$validatedZones = @{}
-	$validatedZones['.'] = $rootKeys  # trust anchor
+		# 2. Walk labels from right to left:
+		#    ".", "com.", "cloudflare.com."
+		$zones = Get-DnssecZonePath -Name $name  # returns [".", "com.", "cloudflare.com."]
 
-	for ($i = 1; $i -lt $zones.Count; $i++)
-	{
-		$child  = $zones[$i]
-		$parent = $zones[$i - 1]
+		$validatedZones = @{}
+		$validatedZones['.'] = $rootKeys  # trust anchor
 
-		$zoneResult = Resolve-DnssecZone -Zone $child -ParentZone $parent -RootServers $RootServers -Trace:$Trace
+		for ($i = 1; $i -lt $zones.Count; $i++)
+		{
+			$child  = $zones[$i]
+			$parent = $zones[$i - 1]
 
-		if (-not $zoneResult.Valid)
+			$zoneResult = Resolve-DnssecZone -Zone $child -ParentZone $parent -RootServers $RootServers -Trace:$Trace
+
+			if (-not $zoneResult.Valid)
+			{
+				return [pscustomobject]@{
+					Valid  = $false
+					Reason = "Zone validation failed for $child : $($zoneResult.Reason)"
+					Chain  = $validatedZones
+				}
+			}
+
+			$validatedZones[$child] = $zoneResult.Dnskeys
+		}
+
+		# 3. Finally, validate the RRset at $Name using the last zone's keys
+		$leaf = Resolve-Dnssec -name $name -type $TypeCode -RootServers $RootServers -Trace:$Trace
+
+		if (-not $leaf.Valid)
 		{
 			return [pscustomobject]@{
 				Valid  = $false
-				Reason = "Zone validation failed for $child : $($zoneResult.Reason)"
+				Reason = "Leaf RRset validation failed: $($leaf.Reason)"
 				Chain  = $validatedZones
+				Leaf   = $leaf
 			}
 		}
 
-		$validatedZones[$child] = $zoneResult.Dnskeys
-	}
-
-	# 3. Finally, validate the RRset at $Name using the last zone's keys
-	$leaf = Resolve-Dnssec -name $name -type $TypeCode -RootServers $RootServers -Trace:$Trace
-
-	if (-not $leaf.Valid)
-	{
-		return [pscustomobject]@{
-			Valid  = $false
-			Reason = "Leaf RRset validation failed: $($leaf.Reason)"
+		[pscustomobject]@{
+			Valid  = $true
+			Reason = 'Full chain validated'
 			Chain  = $validatedZones
 			Leaf   = $leaf
 		}
-	}
 
-	[pscustomobject]@{
-		Valid  = $true
-		Reason = 'Full chain validated'
-		Chain  = $validatedZones
-		Leaf   = $leaf
+	}
+	catch {
+		Write-MyCatchAudit -Source 'Resolve-DnssecChain: unexpected error during chain validation' -ErrorRecord $_
+		return [pscustomobject]@{
+			Valid  = $false
+			Reason = "Unexpected error during chain validation: $($_.Exception.Message)"
+			Chain  = $null
+		}
 	}
 }

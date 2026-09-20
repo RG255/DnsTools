@@ -14,7 +14,7 @@
 		[string]$Path
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	if (-not (Test-Path $Path))
 	{throw "Trust anchor file not found: $Path"}

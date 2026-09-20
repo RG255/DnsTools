@@ -286,8 +286,8 @@ $script:FunctionExportTable = @{
 	# wire-format parsing, and transport safety. They are intentionally internal
 	# to prevent accidental misuse and to maintain a clean public API.
 
-	'Write-Trace' = $false
-	# Internal tracing/logging helper.
+	# 'Write-Trace' entry removed 2026-09-15 - Functions\Write-Trace.ps1 retired (replaced by the
+	# vendored Write-MyFunctionTrace facility; -Message-style calls elsewhere became Write-Verbose).
 
 	'Resolve-NameserverAddress' = $false
 	# Normalizes nameserver input (IPv4/IPv6/hostname).
@@ -370,6 +370,15 @@ $script:FunctionExportTable = @{
 
 	'Test-DnssecDsForDnskey' = $false
 	# Validates DS <-> DNSKEY relationship.
+
+	'Get-DnssecZonePath' = $false
+	# 2026-09-15: splits a name into its root->leaf zone list for Resolve-DnssecChain's walk.
+
+	'Get-RootTrustAnchor' = $false
+	# 2026-09-15: returns the configured trust anchor(s) for zone '.'.
+
+	'Resolve-DnssecZone' = $false
+	# 2026-09-15: validates one zone's DS/DNSKEY/RRSIG chain for Resolve-DnssecChain's per-zone walk.
 
 	'Test-DnssecChain' = $false
 	# Validates full DNSSEC chain of trust.
@@ -699,36 +708,12 @@ $MyVars = @{
 			Scope  = $VSScript
 			Option = $VONone
 		}
-		MyInitialCallStack = @{
-			Value  = $Null
-			Scope  = $VSScript
-			Option = $VONone
-		}
-		MyInitialCallingScript = @{
-			Value  = $Null
-			Scope  = $VSScript
-			Option = $VONone
-		}
-		FTraceInternalCall = @{
-			Value  = $False
-			Scope  = $VSScript
-			Option = $VONone
-		}
-		FTraceAllCalls = @{
-			Value  = $False
-			Scope  = $VSScript
-			Option = $VONone
-		}
-		FTLogFilPath = @{
-			Value  = $Null
-			Scope  = $VSScript
-			Option = $VONone
-		}
-		FTrace = @{
-			Value  = $False
-			Scope  = $VSScript
-			Option = $VONone
-		}
+		# 2026-09-15: MyInitialCallStack/MyInitialCallingScript/FTraceInternalCall/FTraceAllCalls/
+		# FTLogFilPath/FTrace REMOVED - dead declarations (confirmed zero other references anywhere in
+		# this module) from the retired $Script:FTrace facility, replaced by the vendored
+		# Write-MyFunctionTrace/Enable-/Disable-MyFunctionTrace family (see Modules\Shared-Usage.psd1's
+		# DnsTools\0.7 entry), toggled via $env:MyFunctionTraceEnabled instead of a module-scope variable
+		# so it also reaches a NamedPipe-elevated child process.
 		StrContinue = @{
 			Value  = 'Continue'
 			Scope  = $VSScript

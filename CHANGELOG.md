@@ -21,7 +21,19 @@ back-compat aliases:
 - `Helpers\TestClassinFunc.ps1` (dead scratch content - hardcoded wrong path, self-commented-out call
   site, zero references).
 
+### Added
+- Function-trace facility (`Enable-MyFunctionTrace -Option 1-3`, `Disable-MyFunctionTrace`,
+  `Clear-MyFunctionTraceLog`, `Clear-MyFunctionTraceArchive`), vendored, replacing the module's own
+  `Write-Trace`. Per-window trace files (`FunctionTrace-Session-<Id>.log` under
+  `C:\ProgramData\FunctionTrace`); `-Option` is required.
+- Catch-audit housekeeping (`Clear-MyCatchAuditArchive`).
+
 ### Fixed
+- `Resolve-Dnssec` and `Test-DnssecValidation` called `Resolve-DnsIterative` without `-Raw`, so they
+  received the formatted result instead of the raw shape they expect and never validated a zone
+  correctly. Added `-Raw` at all five call sites.
+- `Resolve-DnssecChain` called three functions that did not exist. Implemented them:
+  `Get-DnssecZonePath`, `Get-RootTrustAnchor`, `Resolve-DnssecZone` (all internal).
 - Added `PSAvoidTrailingWhitespace` stripping to every file via the shared formatter (48 files).
 - Added a `PSScriptAnalyzerSettings.psd1` excluding parser-noise rules (`TypeNotFound`,
   `MemberAlreadyDefined`, `AmbiguousTypeReference`) and the deliberate `PSAvoidUsingWriteHost` choice.

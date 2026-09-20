@@ -14,7 +14,7 @@
 		[Parameter(Mandatory)]$rr
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$w = [DnsBinaryWriter]::new()
 	$w.WriteBytes([byte[]](Get-DnssecCanonicalNameWire -name $rr.Name))

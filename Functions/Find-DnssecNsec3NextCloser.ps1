@@ -40,7 +40,7 @@
 		[byte[]]$salt
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	# Filter to real NSEC3 records
 	$records = $Nsec3Records | Where-Object -FilterScript {$_ -is [DnsNsec3Record]}

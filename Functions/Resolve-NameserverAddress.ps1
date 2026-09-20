@@ -34,7 +34,7 @@
 		[switch]$Trace
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$target = $nsName.TrimEnd('.').ToLower()
 	$currentServers = $BootstrapServers | Sort-Object -Unique
@@ -61,13 +61,13 @@
 
 				foreach ($qType in 1, 28)
 				{
-					Write-Trace -Message "Querying $server for $target (type $qType)"
+					Write-Verbose -Message "Querying $server for $target (type $qType)"
 
 					$query = New-DnsQueryPacket -name $target -type $qType -DoBit
 					$bytes = Invoke-DnsUdpQuery -server $server -query $query
 					$resp  = ConvertFrom-DnsPacket -packet $bytes
 
-					Write-Trace -Message "Received response: Q=$($resp.Questions[0].Name) AUTH=$($resp.Authority.Count)"
+					Write-Verbose -Message "Received response: Q=$($resp.Questions[0].Name) AUTH=$($resp.Authority.Count)"
 
 					foreach ($rr in $resp.Answers)
 					{
@@ -97,11 +97,11 @@
 				if ($glueAddrs.Count -gt 0) {
 
 					if ($UseGlueOnly) {
-						Write-Trace -Message "Returning glue addresses: $($glueAddrs -join ', ')"
+						Write-Verbose -Message "Returning glue addresses: $($glueAddrs -join ', ')"
 						return $glueAddrs
 					}
 
-					Write-Trace -Message "Using glue as next-hop: $($glueAddrs -join ', ')"
+					Write-Verbose -Message "Using glue as next-hop: $($glueAddrs -join ', ')"
 					$currentServers = $glueAddrs
 					break
 				}
@@ -131,7 +131,7 @@
 					if ($visitedNsNames.Contains($nsKey)) { continue }
 					$null = $visitedNsNames.Add($nsKey)
 
-					Write-Trace -Message "Recursing to resolve NS name $nsKey"
+					Write-Verbose -Message "Recursing to resolve NS name $nsKey"
 
 					$nsAddrs = Resolve-NameserverAddress -nsName $ns -BootstrapServers $BootstrapServers -UseGlueOnly:$UseGlueOnly -Trace:$Trace
 					if ($nsAddrs) {

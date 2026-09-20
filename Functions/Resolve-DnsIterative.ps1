@@ -8,6 +8,14 @@
         Resolves a DNS name by iteratively querying from root servers through authoritative nameservers to find the answer.
         Use -Name for forward DNS lookups and -IPAddr for reverse (PTR) lookups.
 
+        Every outcome, including a caller usage mistake (e.g. omitting -Type), comes back as a
+        returned object with a Status property - never a thrown exception - so programmatic callers
+        can always branch on $result.Status without needing try/catch. Status values: Success (a real
+        answer), BailOut (resolution could not complete - see Message/Reason), Indeterminate (DNSSEC
+        validation could not complete), Partial (-DualStack: one of A/AAAA failed or the two could not
+        be merged), InvalidArgument (a caller-usage mistake, such as omitting -Type or specifying both
+        -DoT and -DoH).
+
     .PARAMETER Name
         The fully qualified domain name to resolve. Use this for forward DNS lookups.
 
@@ -73,46 +81,23 @@
 	param(
 		[Parameter(Mandatory, ParameterSetName = 'NameSet', Position = 0)]
 		[Parameter(Mandatory, ParameterSetName = 'DualStackSet', Position = 0)]
-		[ValidateScript({
-				# Validate DNS name syntax: labels separated by dots, each label 1-63 chars
-				if ($_ -match '^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.?$') {
-					$true
-				} else {
-					throw "Invalid DNS name syntax: $_"
-				}
-			})]
 		[string]$Name,
 
 		[Parameter(Mandatory, ParameterSetName = 'AddressSet', Position = 0)]
-		[ValidateScript({
-				# Validate IP address syntax (IPv4 or IPv6)
-				$ip = $null
-				if ([System.Net.IPAddress]::TryParse($_, [ref]$ip)) {
-					$true
-				} else {
-					throw "Invalid IP address syntax: $_"
-				}
-			})]
 		[string]$IPAddr,
 
+		# No [ValidateSet(...)] and no inline [ArgumentCompleter(...)] here on purpose. ValidateSet was
+		# tried first and removed - confirmed live 2026-09-15: when a parameter carries BOTH ValidateSet
+		# and ArgumentCompleter, PowerShell's completion engine only invokes the ArgumentCompleter once
+		# at least one character has been typed, silently falling back to ValidateSet's own raw
+		# (mnemonic names and numeric codes mixed together) completion for a bare Tab press on an empty
+		# word instead. The completer itself has since moved to Register-DnsTypeCompleter.ps1 (shared
+		# with ConvertTo-DnsTypeCode, which has the identical "name or code" contract) via
+		# Register-ArgumentCompleter, rather than staying duplicated here as an inline attribute.
+		# Validation happens via ConvertTo-DnsTypeCode's own "Unknown DNS record type: $Type" check a
+		# few lines down instead of at parameter-bind time - still fails fast, just very slightly later
+		# in the function body, not before it starts.
 		[Parameter(ParameterSetName = 'NameSet')]
-		[ValidateSet(
-			# Most common types first (no PTR - use -IPAddr for that)
-			'A', 'AAAA', 'MX', 'TXT', 'CNAME', 'NS', 'SOA', 'SRV', 'CAA',
-			# DNSSEC types
-			'DS', 'DNSKEY', 'RRSIG', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'CDS', 'CDNSKEY',
-			# Security/service types
-			'TLSA', 'SSHFP', 'SMIMEA', 'SVCB', 'HTTPS', 'IPSECKEY', 'OPENPGPKEY',
-			# Less common types
-			'NAPTR', 'DNAME', 'LOC', 'HINFO', 'RP', 'AFSDB', 'WKS', 'SPF', 'URI',
-			# Transfer/special types
-			'TKEY', 'TSIG', 'IXFR', 'AXFR', 'ANY',
-			# Numeric codes (same order, no 12 for PTR)
-			1, 28, 15, 16, 5, 2, 6, 33, 257,
-			43, 48, 46, 47, 50, 51, 59, 60,
-			52, 44, 53, 64, 65, 45, 61,
-			35, 39, 29, 13, 17, 18, 11, 99, 256,
-			249, 250, 251, 252, 255)]
 		$Type,
 
 		[string[]]$RootServers = $script:RootServerAddresses,
@@ -131,35 +116,101 @@
 		[switch]$DualStack,
 
 		[Parameter()]
-		[ValidateScript({
-				# DoT: hostname/IP with optional :port (e.g., "1.1.1.1", "dns.google:853", "[2606:4700::1]:853")
-				if ($_ -match '^(\[[0-9a-fA-F:]+\](:\d+)?|[a-zA-Z0-9.\-]+(:\d+)?)$') { $true }
-				else { throw "Invalid DoT server format: $_. Expected hostname/IP with optional :port" }
-			})]
 		[string]$DoT,
 
 		[Parameter()]
-		[ValidateScript({
-				# DoH: must be https:// URL
-				if ($_ -match '^https://[a-zA-Z0-9.\-]+(:\d+)?(/[^\s]*)?$') { $true }
-				else { throw "Invalid DoH endpoint: $_. Must be an HTTPS URL" }
-			})]
 		[string]$DoH
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
+
+	# Parameter syntax validation, moved out of [ValidateScript(...)] attributes and into the function
+	# body 2026-09-15 (see .DESCRIPTION) so a caller-usage mistake reports as Status='InvalidArgument'
+	# instead of throwing a ParameterBindingException - matching the DoT/DoH-exclusivity and -Type
+	# checks just below. Each Message states the SPECIFIC defect (which label, which length, which
+	# character) rather than a bare "Invalid X" - Test-DnsNameSyntax's own Reason already does this for
+	# -Name; the -IPAddr/-DoT/-DoH checks here are inline since each is a single TryParse/regex test,
+	# not worth a dedicated helper function of their own.
+	if ($PSCmdlet.ParameterSetName -eq 'NameSet' -or $PSCmdlet.ParameterSetName -eq 'DualStackSet') {
+		$nameCheck = Test-DnsNameSyntax -Name $Name
+		if (-not $nameCheck.IsValid) {
+			return [PSCustomObject]@{
+				QueryName = $Name
+				QueryType = $null
+				Status    = 'InvalidArgument'
+				Message   = $nameCheck.Reason
+			}
+		}
+	}
+
+	if ($PSCmdlet.ParameterSetName -eq 'AddressSet') {
+		$parsedIp = $null
+		if (-not [System.Net.IPAddress]::TryParse($IPAddr, [ref]$parsedIp)) {
+			return [PSCustomObject]@{
+				QueryName = $IPAddr
+				QueryType = $null
+				Status    = 'InvalidArgument'
+				Message   = "The -IPAddr value '$IPAddr' is not a valid IPv4 or IPv6 address."
+			}
+		}
+	}
+
+	if ($DoT -and $DoT -notmatch '^(\[[0-9a-fA-F:]+\](:\d+)?|[a-zA-Z0-9.\-]+(:\d+)?)$') {
+		return [PSCustomObject]@{
+			QueryName = $Name
+			QueryType = $null
+			Status    = 'InvalidArgument'
+			Message   = "The -DoT value '$DoT' is not a valid hostname/IP with an optional :port (e.g. '1.1.1.1', 'dns.google:853', '[2606:4700::1]:853')."
+		}
+	}
+
+	if ($DoH -and $DoH -notmatch '^https://[a-zA-Z0-9.\-]+(:\d+)?(/[^\s]*)?$') {
+		return [PSCustomObject]@{
+			QueryName = $Name
+			QueryType = $null
+			Status    = 'InvalidArgument'
+			Message   = "The -DoH value '$DoH' is not a valid HTTPS URL (e.g. 'https://dns.google/dns-query')."
+		}
+	}
 
 	# Validate transport parameter exclusivity
+	# Returned as a Status object (not thrown) for the same reason as the -Type check below: this
+	# function already reports every other outcome (Final/BailOut/Indeterminate/Partial/...) as data a
+	# caller checks via $result.Status, not via try/catch - a caller-usage mistake like this is no
+	# different in kind from "resolution failed", and forcing a try/catch onto only THIS one case
+	# (found live 2026-09-15, reported by the user, for the -Type check) made it impossible to handle
+	# programmatically the same simple way as everything else this function can return.
 	if ($DoT -and $DoH) {
-		throw "The -DoT and -DoH parameters are mutually exclusive. Specify only one."
+		return [PSCustomObject]@{
+			QueryName = $Name
+			QueryType = $null
+			Status    = 'InvalidArgument'
+			Message   = "The -DoT and -DoH parameters are mutually exclusive. Specify only one."
+		}
 	}
 
 	# Handle Address parameter - convert to reverse DNS name for PTR lookup
 	$isPtrLookup = $false
 	if ($PSCmdlet.ParameterSetName -eq 'AddressSet') {
-		$Name = ConvertTo-ReverseDnsName -IPAddress $IPAddr
+		# $IPAddr already passed the -IPAddr syntax check above, so a failure here is an internal bug in
+		# ConvertTo-ReverseDnsName itself, not a caller mistake - reported as BailOut (not InvalidArgument)
+		# and via Write-MyCatchAudit, same convention as every other unexpected-failure path in this
+		# function, instead of letting it propagate as a raw uncaught exception (found live 2026-09-15
+		# during the try/catch coverage audit - this call had no guard at all).
+		try {
+			$Name = ConvertTo-ReverseDnsName -IPAddress $IPAddr
+		}
+		catch {
+			Write-MyCatchAudit -Source 'Resolve-DnsIterative: ConvertTo-ReverseDnsName failed for an already-validated -IPAddr value' -ErrorRecord $_
+			return [PSCustomObject]@{
+				QueryName = $IPAddr
+				QueryType = $null
+				Status    = 'BailOut'
+				Message   = "Failed to convert '$IPAddr' to a reverse-DNS name: $($_.Exception.Message)"
+			}
+		}
 		$isPtrLookup = $true
-		Write-Trace -Message "PTR query: converted $IPAddr to $Name"
+		Write-Verbose -Message "PTR query: converted $IPAddr to $Name"
 	}
 
 	# Handle DualStack mode - query both A and AAAA and merge results
@@ -266,9 +317,16 @@
 		$TypeDisplay = 'PTR(12)'
 	}
 	else {
-		# Require type parameter when not in DualStack mode
+		# Require type parameter when not in DualStack mode. Returned as a Status object, not thrown -
+		# see the -DoT/-DoH check above for why: a caller checking $result.Status can handle this
+		# exactly like every other outcome this function reports, with no try/catch required.
 		if (-not $Type) {
-			throw "The -Type parameter is required unless -DualStack is specified."
+			return [PSCustomObject]@{
+				QueryName = $Name
+				QueryType = $null
+				Status    = 'InvalidArgument'
+				Message   = "The -Type parameter is required unless -DualStack is specified. Example: -Type A (or AAAA, MX, TXT, NS, ...; press Tab after -Type to see the full list, or pass a numeric type code such as 15)."
+			}
 		}
 
 		# Convert type name to code if needed
@@ -280,7 +338,7 @@
 	function ReturnResult {
 		param($RawResult)
 
-		If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+		If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 		# Perform DNSSEC validation if requested and we have a response
 		$dnssecResult = $null
@@ -296,13 +354,24 @@
 		}
 		$formatted = Format-DnsIterativeResult -Result $RawResult -QueryName $Name -QueryType $TypeDisplay
 		if ($dnssecResult) {
-			$formatted | Add-Member -NotePropertyName 'DnssecStatus' -NotePropertyValue $dnssecResult.Status -Force
-			$formatted | Add-Member -NotePropertyName 'DnssecDetails' -NotePropertyValue $dnssecResult.Details -Force
-			if ($dnssecResult.DnskeyRecords) {
-				$formatted | Add-Member -NotePropertyName 'DnskeyRecords' -NotePropertyValue $dnssecResult.DnskeyRecords -Force
+			# Bracket notation, not dot notation: ValidateDnssecResponse's 'Unsigned'/'Indeterminate'
+			# returns are @{ Status = ...; Details = ... } ONLY - no DnskeyRecords/DsRecords keys at
+			# all (those only exist on the 'Secure'/'Bogus' path, once DNSKEY/DS retrieval actually
+			# ran). Dot notation on a genuinely absent hashtable key throws "The property '...' cannot
+			# be found on this object" under this module's own Set-StrictMode -Version Latest -
+			# confirmed live 2026-09-15 resolving www.microsoft.com -ValidateDnssec (an unsigned name):
+			# the thrown exception was swallowed by the OUTER per-server try/catch a few lines up
+			# (logged as "server query failed, trying next"), discarding an already-successful CNAME
+			# chain resolution and leaving the iterative loop to eventually hit its own
+			# server-set-cycle bailout instead - a real answer silently replaced by a misleading one.
+			# Same root cause and same fix as Get-MyError.ps1's identical bug the same day.
+			$formatted | Add-Member -NotePropertyName 'DnssecStatus' -NotePropertyValue $dnssecResult['Status'] -Force
+			$formatted | Add-Member -NotePropertyName 'DnssecDetails' -NotePropertyValue $dnssecResult['Details'] -Force
+			if ($dnssecResult['DnskeyRecords']) {
+				$formatted | Add-Member -NotePropertyName 'DnskeyRecords' -NotePropertyValue $dnssecResult['DnskeyRecords'] -Force
 			}
-			if ($dnssecResult.DsRecords) {
-				$formatted | Add-Member -NotePropertyName 'DsRecords' -NotePropertyValue $dnssecResult.DsRecords -Force
+			if ($dnssecResult['DsRecords']) {
+				$formatted | Add-Member -NotePropertyName 'DsRecords' -NotePropertyValue $dnssecResult['DsRecords'] -Force
 			}
 		}
 		return $formatted
@@ -316,7 +385,7 @@
 			[string[]]$RootServers
 		)
 
-		If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+		If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 		$details = @()
 		$overallValid = $true
@@ -427,12 +496,16 @@
 
 	# If DoT or DoH specified, perform direct recursive query (not iterative)
 	if ($DoT -or $DoH) {
-		Write-Trace -Message "Using encrypted transport - delegating iteration to resolver"
-
-		$queryBytes = New-DnsQueryPacket -name $fqdn -type $TypeCode -DoBit
-		$queryPacket = ConvertFrom-DnsWireBuffer -bytes $queryBytes
+		Write-Verbose -Message "Using encrypted transport - delegating iteration to resolver"
 
 		try {
+			# New-DnsQueryPacket/ConvertFrom-DnsWireBuffer moved inside this try 2026-09-15 (found
+			# unguarded during the try/catch coverage audit) - a malformed packet here is the same kind
+			# of transport-path failure as the DoH/DoT query below, and the existing catch already
+			# reports it as BailOut via the same Reason shape.
+			$queryBytes = New-DnsQueryPacket -name $fqdn -type $TypeCode -DoBit
+			$queryPacket = ConvertFrom-DnsWireBuffer -bytes $queryBytes
+
 			if ($DoH) {
 				$client = [DnsDohClient]::new($DoH)
 				$resp = $client.Query($queryPacket)
@@ -476,13 +549,24 @@
 	$maxIterations = 40
 	$iteration = 0
 
+	# Captures the most recent per-server failure (e.g. a malformed-packet parse exception from
+	# ConvertFrom-DnsPacket) so it can be surfaced in the eventual BailOut's Reason instead of only
+	# reaching -Verbose/Write-MyCatchAudit - added 2026-09-15 after confirming the low-level DNS wire
+	# parsers (DnsBinaryReader, DnsPacket, etc.) already throw specific, useful messages ("DNS name
+	# compression loop detected at offset 42") that were being silently dropped by the catch below once
+	# every server in the set had failed, leaving the caller with only a generic "Max iterations
+	# reached" / "Server-set cycle detected" and no way to tell WHY without re-running with -Verbose.
+	$lastServerError = $null
+
 	while ($iteration++ -lt $maxIterations)
 	{
 		$setKey = ($currentServers -join ',')
 		if ($visitedServerSets.Contains($setKey)) {
+			$reason = "Server-set cycle detected: $setKey"
+			if ($lastServerError) { $reason += " (last error: $lastServerError)" }
 			$rawResult = [pscustomobject]@{
 				Status = 'BailOut'
-				Reason = "Server-set cycle detected: $setKey"
+				Reason = $reason
 			}
 			return (ReturnResult -RawResult $rawResult)
 		}
@@ -492,7 +576,7 @@
 		{
 			try
 			{
-				Write-Trace -Message "Querying $server for $fqdn (type $TypeDisplay)"
+				Write-Verbose -Message "Querying $server for $fqdn (type $TypeDisplay)"
 
 				$query = New-DnsQueryPacket -name $fqdn -type $TypeCode -DoBit
 				$bytes = Invoke-DnsUdpQuery -server $server -query $query
@@ -516,7 +600,7 @@
 					# If we got a CNAME but wanted A/AAAA, follow the CNAME chain
 					if ($cnameRecords.Count -gt 0 -and $TypeCode -in @(1, 28)) {
 						$cnameTarget = $cnameRecords[0].RDataObject.Target
-						Write-Trace -Message "Following CNAME: $fqdn -> $cnameTarget"
+						Write-Verbose -Message "Following CNAME: $fqdn -> $cnameTarget"
 
 						# Recursively resolve the CNAME target
 						$cnameResult = Resolve-DnsIterative -name $cnameTarget -type $TypeCode -RootServers $RootServers -Raw
@@ -597,15 +681,18 @@
 				# reference, a typo in a property name), which then present as "no servers
 				# responded" with nothing anywhere to say otherwise. Verbose keeps the control
 				# flow identical while leaving a trail when every server appears to fail.
+				$lastServerError = "$($_.Exception.Message) (from $server)"
 				Write-Verbose -Message ('Resolve-DnsIterative: server query failed, trying next: {0}' -f $_.Exception.Message)
 				Write-MyCatchAudit -Source 'Resolve-DnsIterative: one nameserver in the candidate set failed to query - trying the next one is correct, but this leaves a trail for the every-server-fails case' -ErrorRecord $_
 			}
 		}
 	}
 
+	$reason = "Max iterations ($maxIterations) reached"
+	if ($lastServerError) { $reason += " (last error: $lastServerError)" }
 	$rawResult = [pscustomobject]@{
 		Status = 'BailOut'
-		Reason = "Max iterations ($maxIterations) reached"
+		Reason = $reason
 	}
 	return (ReturnResult -RawResult $rawResult)
 }

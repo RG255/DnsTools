@@ -18,7 +18,7 @@
 		[int]$type = 1
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$result = Resolve-DnssecName -name $name -type $type
 	return $result.Valid

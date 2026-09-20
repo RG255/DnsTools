@@ -34,7 +34,7 @@
 		[byte[]]$salt
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	if ($Algorithm -ne 1)
 	{throw "Get-DnssecNsec3Hash: Only algorithm 1 (SHA-1) is supported (got $Algorithm)."}

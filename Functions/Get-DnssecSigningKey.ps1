@@ -18,7 +18,7 @@
 		[DnsResourceRecord[]]$DnskeyRrset
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$candidates = $DnskeyRrset |
 		Where-Object -FilterScript {

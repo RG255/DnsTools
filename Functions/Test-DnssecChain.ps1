@@ -26,7 +26,7 @@
 		[string]$ZoneName
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$dnskeys = $DnskeyRrset | ForEach-Object -Process {$_.RDataObject}
 	$dsRecords = $DsRrset | ForEach-Object -Process {$_.RDataObject}

@@ -18,7 +18,7 @@
 		[bool]$IsDelegation
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	# Opt-Out flag is bit 0
 	$optOut = ($Nsec3.Flags -band 0x01) -ne 0

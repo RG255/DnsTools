@@ -14,7 +14,7 @@
 		[DnsResourceRecord[]]$Rrset
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	if (-not $Rrset -or $Rrset.Count -eq 0)
 	{throw 'RRset is empty.'}

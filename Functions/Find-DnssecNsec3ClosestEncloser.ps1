@@ -39,7 +39,7 @@
 		[switch]$Trace
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	#
 	# Filter to real DnsNsec3Record instances.
@@ -65,7 +65,7 @@
 	{
 		# Build candidate name: e.g. "b.example.com"
 		$candidate = ($labels[$i..($labels.Length - 1)] -join '.')
-		if ($Trace) { Write-Trace -Message "CANDIDATE: '$candidate'" }
+		if ($Trace) { Write-Verbose -Message "CANDIDATE: '$candidate'" }
 
 		# Canonical form for hashing: MUST end with "."
 		$canon = if ($candidate.EndsWith('.'))
@@ -79,7 +79,7 @@
 			-Algorithm $HashAlgorithm `
 			-Iterations $Iterations `
 			-salt $salt
-		if ($Trace) { Write-Trace -Message "HASH: $([BitConverter]::ToString($hash))" }
+		if ($Trace) { Write-Verbose -Message "HASH: $([BitConverter]::ToString($hash))" }
 
 		#
 		# Match against OwnerHash (NOT NextHash)

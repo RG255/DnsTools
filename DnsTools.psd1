@@ -21,14 +21,25 @@
 	FunctionsToExport = @(
 		'Add-DnssecTrustAnchor', 'ConvertFrom-DnsClassCode', 'ConvertFrom-DnsPacket', 'ConvertFrom-DnssecAlgorithmCode',
 		'ConvertFrom-DnsTypeCode', 'ConvertTo-DnsClassCode', 'ConvertTo-DnssecAlgorithmCode', 'ConvertTo-DnsTypeCode',
-		'Clear-MyCatchAuditLog', 'Disable-MyCatchAudit', 'Enable-MyCatchAudit',
-		'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName', 'Get-DnssecTrustAnchorStore',
-		'Get-MyCatchAuditLog', 'Import-DnssecTrustAnchorFile', 'Invoke-DnsUdpQuery', 'Invoke-MyCatchAuditTriage', 'New-DnsQueryPacket',
+		'Clear-MyCatchAuditLog', 'Clear-MyFunctionTraceLog', 'Clear-MyCatchAuditArchive', 'Clear-MyFunctionTraceArchive', 'Disable-MyCatchAudit', 'Disable-MyFunctionTrace', 'Enable-MyCatchAudit',
+		'Enable-MyFunctionTrace', 'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName',
+		'Get-DnssecTrustAnchorStore', 'Get-MyCatchAuditLog', 'Import-DnssecTrustAnchorFile', 'Invoke-DnsUdpQuery',
+		'Invoke-MyCatchAuditTriage', 'New-DnsQueryPacket',
 		'Resolve-DnsIterative', 'Resolve-Dnssec', 'Resolve-DnssecChain', 'Resolve-DnssecName',
 		'Show-MyCatchAuditSummary', 'Test-DnssecName', 'Test-DnssecValidation', 'Update-DnsRootHintsFile',
 		'Update-DnssecTrustAnchorFile'
 		# Write-MyCatchAudit deliberately NOT exported - vendored, internal-only, same as Get-MyError
 		# in every other module. See Modules\Shared-Usage.psd1's EXCEPTION note (2026-09-07).
+		# Write-MyFunctionTrace/Get-MyFunctionTracePath/Format-MyFunctionTraceLine (2026-09-15) - same
+		# exception: vendored, internal-only. Only the Enable-/Disable- toggle pair is exported.
+		# Register-DnsTypeCompleter (2026-09-15) also deliberately NOT exported - a one-shot setup
+		# function called once, from a bare top-level statement at the bottom of its own file, to
+		# register shared Tab completion for Resolve-DnsIterative's and ConvertTo-DnsTypeCode's -Type
+		# parameters. Nothing outside module import needs to call it again.
+		# Test-DnsNameSyntax (2026-09-15) also deliberately NOT exported - an internal helper called
+		# only by Resolve-DnsIterative's own body-based -Name validation (moved out of a
+		# [ValidateScript(...)] attribute so a bad name reports Status='InvalidArgument' instead of
+		# throwing). Not part of the module's public surface.
 	)
 	CmdletsToExport   = @()
 	# '*' not @(): the psm1 exports its variable vocabulary via Export-ModuleMember

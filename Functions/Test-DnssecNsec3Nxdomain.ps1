@@ -37,7 +37,7 @@
 		[byte[]]$salt
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	# 1. Closest Encloser
 	$ce = Find-DnssecNsec3ClosestEncloser `

@@ -34,11 +34,7 @@
 		[string[]]$RootServers = $script:RootServerAddresses
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
-
-	# Convert type name to code if needed
-	$TypeCode = ConvertTo-DnsTypeCode -Type $Type
-	$TypeDisplay = Format-DnsTypeName -Type $TypeCode
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$report = [System.Collections.ArrayList]::new()
 	$issues = [System.Collections.ArrayList]::new()
@@ -73,6 +69,29 @@
 			return $hex.Substring(0, $maxLength) + "... ($($bytes.Length) bytes)"
 		}
 		return $hex
+	}
+
+	# Convert type name to code if needed. Moved below Add-ReportEntry's own definition and wrapped in
+	# Try/Catch 2026-09-15 (found unguarded during the try/catch coverage audit) - a bad -Type value used
+	# to throw a raw uncaught exception before a single report entry existed; now it reports through the
+	# same Report/Issues/Passed shape as every other failure this function can produce.
+	try {
+		$TypeCode = ConvertTo-DnsTypeCode -Type $Type
+		$TypeDisplay = Format-DnsTypeName -Type $TypeCode
+	}
+	catch {
+		Write-MyCatchAudit -Source 'Test-DnssecValidation: invalid -Type value' -ErrorRecord $_
+		[void]$issues.Add("Invalid -Type value '$Type': $($_.Exception.Message)")
+		return [PSCustomObject]@{
+			Name           = $Name
+			Type           = $Type
+			TypeCode       = $null
+			ValidationTime = (Get-Date) - $startTime
+			Passed         = $false
+			ZonesValidated = @{}
+			Issues         = $issues
+			Report         = $report
+		}
 	}
 
 	Add-ReportEntry -Section 'INITIALIZATION' -Message "Starting DNSSEC validation for: $Name (Type: $TypeDisplay)"
@@ -135,7 +154,11 @@
 		try {
 			# Query for DS records in parent zone
 			Add-ReportEntry -Section 'DS QUERY' -Message "Querying DS records for $childZone from parent zone $parentZone"
-			$dsResult = Resolve-DnsIterative -name $childZone -type 43 -RootServers $RootServers
+			# -Raw added 2026-09-15: same real bug as Resolve-Dnssec.ps1's identical pattern - without it
+			# this gets the FORMATTED result (Status='Success', no .Reason property), so Status was NEVER
+			# 'Final' and every zone reported "no DS records" or crashed on $dsResult.Reason (caught by
+			# this try/catch and shown as an ERROR entry) regardless of whether the zone actually had one.
+			$dsResult = Resolve-DnsIterative -name $childZone -type 43 -RootServers $RootServers -Raw
 
 			if ($dsResult.Status -ne 'Final') {
 				Add-ReportEntry -Section 'DS QUERY' -Level 'WARNING' -Message "DS query failed: $($dsResult.Reason)"
@@ -159,7 +182,7 @@
 
 			# Query for DNSKEY records in child zone
 			Add-ReportEntry -Section 'DNSKEY QUERY' -Message "Querying DNSKEY records for $childZone"
-			$dnskeyResult = Resolve-DnsIterative -name $childZone -type 48 -RootServers $RootServers
+			$dnskeyResult = Resolve-DnsIterative -name $childZone -type 48 -RootServers $RootServers -Raw
 
 			if ($dnskeyResult.Status -ne 'Final') {
 				Add-ReportEntry -Section 'DNSKEY QUERY' -Level 'ERROR' -Message "DNSKEY query failed: $($dnskeyResult.Reason)"
@@ -348,33 +371,6 @@
 	}
 	else {
 		Add-ReportEntry -Section 'VERDICT' -Level 'ERROR' -Message "DNSSEC VALIDATION: FAILED - Chain of trust is broken"
-	}
-
-	# Helper function to get type name
-	function Get-TypeName {
-		param([int]$typeNum)
-		$typeMap = @{
-			1 = 'A'; 2 = 'NS'; 5 = 'CNAME'; 6 = 'SOA'; 15 = 'MX'; 16 = 'TXT'
-			28 = 'AAAA'; 43 = 'DS'; 46 = 'RRSIG'; 48 = 'DNSKEY'; 50 = 'NSEC3'
-		}
-		if ($typeMap.ContainsKey($typeNum)) { return $typeMap[$typeNum] }
-		return "TYPE$typeNum"
-	}
-
-	# Helper function to format answer data
-	function Format-AnswerData {
-		param($answer)
-		if (-not $answer.RDataObject) { return '' }
-		$rdata = $answer.RDataObject
-
-		switch ($answer.Type) {
-			1 { return $rdata.Address }
-			28 { return $rdata.Address }
-			2 { return $rdata.NsName }
-			5 { return $rdata.CName }
-			15 { return "$($rdata.Preference) $($rdata.Exchange)" }
-			default { return '[Complex RDATA]' }
-		}
 	}
 
 	# Return the report and validation result

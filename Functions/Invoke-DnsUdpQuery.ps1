@@ -26,7 +26,7 @@
 		[int]$TimeoutMs = 3000
 	)
 
-	If ($Script:FTrace) { Write-Trace -CallStack (Get-PSCallStack) }
+	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 	$udp = New-Object -TypeName System.Net.Sockets.UdpClient
 	$udp.Client.ReceiveTimeout = $TimeoutMs
