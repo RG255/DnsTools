@@ -18,11 +18,14 @@ starting from the root servers and following the delegation chain to authoritati
 
 ## Installation
 
-Deploy with the repo's standard deployment script (installs to the admin-only, AllUsers
-Program Files module path):
+Clone or copy this repository into a folder named after the version, inside a module folder on your
+`$env:PSModulePath`:
 
 ```powershell
-powershell.exe -NoProfile -File "D:\PowerShellScripts\Modules\Deploy-Modules.ps1" -Module DnsTools -Version 0.7
+# PowerShell 7
+git clone https://github.com/RG255/DnsTools "C:\Program Files\PowerShell\Modules\DnsTools\0.7"
+# Windows PowerShell 5.1
+git clone https://github.com/RG255/DnsTools "C:\Program Files\WindowsPowerShell\Modules\DnsTools\0.7"
 ```
 
 Then import:

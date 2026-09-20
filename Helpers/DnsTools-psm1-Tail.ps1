@@ -188,7 +188,7 @@ try
 	$VarDefFiles = @($PSD1Data.PrivateData.ModuleVars[''].Values)
 	$Exclude = @('Define-CustomXML|\.zip$')
 	$MyPath = (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions\*{0}' -f $StrExtPS1) -ErrorAction Stop)
-	# Vendored CommonScripts copies (see Shared-Usage.psd1) sit in their own 'vendored' subfolder
+	# Vendored shared-utility copies sit in their own 'vendored' subfolder
 	# (changed 2026-09-13) for filesystem visibility - unioned in here so they go through the same
 	# export-table logic below.
 	$MyVendoredPath = (Join-Path -Path $ModuleScriptRoot -ChildPath ('Functions\vendored\*{0}' -f $StrExtPS1))

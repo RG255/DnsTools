@@ -29,7 +29,7 @@
 		'Show-MyCatchAuditSummary', 'Test-DnssecName', 'Test-DnssecValidation', 'Update-DnsRootHintsFile',
 		'Update-DnssecTrustAnchorFile'
 		# Write-MyCatchAudit deliberately NOT exported - vendored, internal-only, same as Get-MyError
-		# in every other module. See Modules\Shared-Usage.psd1's EXCEPTION note (2026-09-07).
+		# in every other module. (2026-09-07).
 		# Write-MyFunctionTrace/Get-MyFunctionTracePath/Format-MyFunctionTraceLine (2026-09-15) - same
 		# exception: vendored, internal-only. Only the Enable-/Disable- toggle pair is exported.
 		# Register-DnsTypeCompleter (2026-09-15) also deliberately NOT exported - a one-shot setup

@@ -3,7 +3,7 @@
 ## v0.7
 
 ### Breaking changes
-PSScriptAnalyzer cleanup pass (see the repo's `_PlanningDocs\_Repo\2026-09-12_PSSA-Cleanup-Plan.md`).
+PSScriptAnalyzer cleanup pass.
 Zero external usage confirmed (public repo, 0 stars/forks/subscribers/releases) - hard renames, no
 back-compat aliases:
 

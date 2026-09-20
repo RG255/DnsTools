@@ -711,8 +711,8 @@ $MyVars = @{
 		# 2026-09-15: MyInitialCallStack/MyInitialCallingScript/FTraceInternalCall/FTraceAllCalls/
 		# FTLogFilPath/FTrace REMOVED - dead declarations (confirmed zero other references anywhere in
 		# this module) from the retired $Script:FTrace facility, replaced by the vendored
-		# Write-MyFunctionTrace/Enable-/Disable-MyFunctionTrace family (see Modules\Shared-Usage.psd1's
-		# DnsTools\0.7 entry), toggled via $env:MyFunctionTraceEnabled instead of a module-scope variable
+		# Write-MyFunctionTrace/Enable-/Disable-MyFunctionTrace family,
+		# toggled via $env:MyFunctionTraceEnabled instead of a module-scope variable
 		# so it also reaches a NamedPipe-elevated child process.
 		StrContinue = @{
 			Value  = 'Continue'
