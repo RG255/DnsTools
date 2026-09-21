@@ -1,4 +1,4 @@
-﻿# VENDORED from CommonScripts\0.2\Functions\Enable-MyFunctionTrace.ps1 by Sync-SharedUtilities [SHA256 2A3ABF9350CD8B71C36B150D22CAE9EEC7C63969DDEF9FFFE770674106B941D0] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
+﻿# VENDORED from CommonScripts\0.2\Functions\Enable-MyFunctionTrace.ps1 by Sync-SharedUtilities [SHA256 0559E222F4DF1A365CE64D3D3607A52400B26BA277CF5EFEECDE24865C985C2F] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
 Function Enable-MyFunctionTrace
 {
 	<#
@@ -130,6 +130,22 @@ see .PARAMETER Option; it used to default to 1). Every instrumented
 		{ $null = New-Item -Path $Private:LogPath -ItemType File -ErrorAction Stop }
 	}
 	Catch { Write-MyCatchAudit -Source 'Enable-MyFunctionTrace: pre-creating the trace log file' -ErrorRecord $_ }
+
+	# Advisory only - never blocks tracing. The folder is created with the parent folder's default
+	# permissions, which let every local user read every log; say so once, and how to fix it. Quiet once the
+	# folder is locked down, or when $env:MyFunctionTraceNoAclWarning is set (e.g. a single-user machine).
+	If (-not $env:MyFunctionTraceNoAclWarning)
+	{
+		Try
+		{
+			$Private:Acl = Protect-MyFunctionTraceFolder -Check -FolderOnly
+			If (-not $Private:Acl.LockedDown)
+			{
+				Write-Warning -Message ('The function-trace folder {0} is readable by every local user. On a shared machine, lock it down from an elevated prompt with: Protect-MyFunctionTraceFolder   (set $env:MyFunctionTraceNoAclWarning = ''1'' to silence this)' -f $Private:Acl.Path)
+			}
+		}
+		Catch { Write-MyCatchAudit -Source 'Enable-MyFunctionTrace: checking the trace folder ACL' -ErrorRecord $_ }
+	}
 
 	Write-Output -InputObject ('Function-call tracing is ON (Option={0}) for this process. Log: {1}' -f $Option, $Private:LogPath)
 }

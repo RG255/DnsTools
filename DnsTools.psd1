@@ -21,7 +21,7 @@
 	FunctionsToExport = @(
 		'Add-DnssecTrustAnchor', 'ConvertFrom-DnsClassCode', 'ConvertFrom-DnsPacket', 'ConvertFrom-DnssecAlgorithmCode',
 		'ConvertFrom-DnsTypeCode', 'ConvertTo-DnsClassCode', 'ConvertTo-DnssecAlgorithmCode', 'ConvertTo-DnsTypeCode',
-		'Clear-MyCatchAuditLog', 'Clear-MyFunctionTraceLog', 'Clear-MyCatchAuditArchive', 'Clear-MyFunctionTraceArchive', 'Disable-MyCatchAudit', 'Disable-MyFunctionTrace', 'Enable-MyCatchAudit',
+		'Clear-MyCatchAuditLog', 'Clear-MyFunctionTraceLog', 'Clear-MyCatchAuditArchive', 'Clear-MyFunctionTraceArchive', 'Protect-MyFunctionTraceFolder','Disable-MyCatchAudit', 'Disable-MyFunctionTrace', 'Enable-MyCatchAudit',
 		'Enable-MyFunctionTrace', 'Format-DnsClassName', 'Format-DnssecAlgorithmName', 'Format-DnsTypeName',
 		'Get-DnssecTrustAnchorStore', 'Get-MyCatchAuditLog', 'Import-DnssecTrustAnchorFile', 'Invoke-DnsUdpQuery',
 		'Invoke-MyCatchAuditTriage', 'New-DnsQueryPacket',

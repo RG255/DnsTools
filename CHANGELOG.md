@@ -27,6 +27,9 @@ back-compat aliases:
   `Write-Trace`. Per-window trace files (`FunctionTrace-Session-<Id>.log` under
   `C:\ProgramData\FunctionTrace`); `-Option` is required.
 - Catch-audit housekeeping (`Clear-MyCatchAuditArchive`).
+- `Protect-MyFunctionTraceFolder` (2026-09-21): locks the trace-log folder so other local users cannot read your
+  logs (`-Check` reports without elevation). `Enable-MyFunctionTrace` warns once when the folder is not locked
+  down; `$env:MyFunctionTraceNoAclWarning = '1'` silences it.
 
 ### Fixed
 - `Resolve-Dnssec` and `Test-DnssecValidation` called `Resolve-DnsIterative` without `-Raw`, so they
