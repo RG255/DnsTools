@@ -1,4 +1,4 @@
-# DnsTools Changelog
+﻿# DnsTools Changelog
 
 ## v0.8
 
@@ -48,12 +48,20 @@
 - NSEC3 `Salt`, RRSIG `Signature`, zero-length `RawRData`, IPSECKEY and OPENPGPKEY keys were `$null` when empty (an `$x = if (...) {...} else {[byte[]]@()}`
   result is unrolled); now empty arrays.
 - Signature algorithms 5 and 7 (RSA/SHA-1), 10 (RSA/SHA-512) and 14 (ECDSA P-384) are verified in addition to 8 and 13; RSA key lengths are validated;
-  crypto objects are disposed. Ed25519/Ed448 (15, 16) remain unsupported (not in .NET) and throw, which callers count as a failed verification.
+  crypto objects are disposed. Ed25519 (15) was added afterwards (below); Ed448 (16) remains unsupported and throws, which callers count as a failed verification.
 - DualStack now merges when the two response codes agree (it required the same random server). The merged `DnssecStatus` is the worse of the two.
 
-### Known, not yet fixed
-- An NXDOMAIN proof is not validated (only the missing-DS denial is); Ed25519/Ed448 are not supported.
+- Signed NXDOMAIN and NODATA answers are authenticated (`Test-DnssecNegativeResponse`): SOA signed by the zone, then NSEC (name covered plus
+  wildcard covered, or a matching NSEC listing neither the type nor a CNAME) or NSEC3 (RFC 5155 section 8.4 closest-encloser proof, or a matching
+  record). `Resolve-Dnssec` and `-ValidateDnssec` use it; a stripped proof from a signed zone is `Bogus`, a provably unsigned zone is `Insecure`.
+  Verified live on example.com, ietf.org, iana.org (NSEC3 NXDOMAIN) and microsoft.com (Insecure). New `Compare-DnsCanonicalName` (RFC 4034 section 6.1).
+- Ed25519 (algorithm 15) is verified by a small managed RFC 8032 verifier (`Test-DnssecEd25519Signature`, compiled on first use): neither .NET
+  Framework nor the .NET versions PowerShell 7 ships on have the primitive. Checked against RFC 8032 vectors and OpenSSL-made signatures under both hosts.
+  Algorithm 14 verified live on fedoraproject.org.
 
+### Known, not yet fixed
+- Ed448 (algorithm 16) is not supported (no SHAKE256 / curve448 in .NET) and throws "Unsupported DNSSEC algorithm", which counts as a failed
+  verification. NSEC3 opt-out and wildcard-synthesised NODATA denials (other than the DS case) are reported `Indeterminate` rather than proven.
 ## v0.7
 
 ### Breaking changes

@@ -63,6 +63,27 @@
 		}
 
 		$resp    = $iter.Response
+
+		# 0.8: a negative answer (NXDOMAIN / NODATA) has nothing to sign; its denial of existence is authenticated
+		# from the SOA + NSEC/NSEC3 records instead.
+		if ($iter.PSObject.Properties['Negative'] -and @($iter.Response.Answers).Count -eq 0)
+		{
+			$neg = Test-DnssecNegativeResponse -Response $iter.Response -QueryName $name -QueryType $TypeCode -RootServers $RootServers
+			$negValid = ($neg.Status -eq 'Secure')
+			$negReason = 'Authenticated denial of existence ({0}): {1}' -f $neg.Kind, ($neg.Details -join '; ')
+			if (-not $negValid)
+			{$negReason = 'Denial of existence ({0}) not authenticated - {1}: {2}' -f $neg.Kind, $neg.Status.ToLower(), ($neg.Details -join '; ')}
+			return [pscustomobject]@{
+				Valid    = $negValid
+				Reason   = $negReason
+				Answer   = $null
+				Rrsigs   = @()
+				Dnskeys  = @()
+				Status   = $neg.Status
+				Negative = $neg.Kind
+				Details  = $neg.Details
+			}
+		}
 		$rrsigs  = @($resp.Answers | Where-Object -FilterScript {$_.Type -eq 46})
 		$answers = @($resp.Answers | Where-Object -FilterScript {$_.Type -ne 46})
 

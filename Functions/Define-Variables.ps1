@@ -383,6 +383,21 @@ $script:FunctionExportTable = @{
 	'Test-DnssecChain' = $false
 	# Validates full DNSSEC chain of trust.
 
+	'Test-DnssecDsAbsence' = $false
+	# 0.8: proves a delegation has no DS from signed NSEC/NSEC3 (internal).
+
+	'Get-DnssecInsecureProof' = $false
+	# 0.8: walks zone cuts to tell a provably unsigned zone from a stripped signature (internal).
+
+	'Test-DnssecNegativeResponse' = $false
+	# 0.8: validates a signed NXDOMAIN / NODATA answer from SOA + NSEC/NSEC3 (internal).
+
+	'Compare-DnsCanonicalName' = $false
+	# 0.8: RFC 4034 section 6.1 name ordering, for NSEC coverage checks (internal).
+
+	'Test-DnssecEd25519Signature' = $false
+	# 0.8: managed Ed25519 verifier (DNSSEC algorithm 15); .NET has no primitive (internal).
+
 	'Test-DnsZoneApex' = $false
 	# 0.8: true when a name owns its own SOA (a zone apex); used to build the zone path (internal).
 

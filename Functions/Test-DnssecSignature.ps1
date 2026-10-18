@@ -108,5 +108,11 @@
 		{$ecdsa.Dispose()}
 	}
 
+	if ($algorithm -eq 15)
+	{
+		# Ed25519 (RFC 8080): 32-byte public key, 64-byte signature. No .NET primitive exists, so a managed verifier is used.
+		return (Test-DnssecEd25519Signature -PublicKey ([byte[]]$Dnskey.PublicKey) -Signature ([byte[]]$Rrsig.Signature) -Message $SignedData)
+	}
+
 	throw "Unsupported DNSSEC algorithm: $algorithm"
 }

@@ -88,9 +88,9 @@ InModuleScope DnsTools {
 				Test-DnssecSignature -SignedData ([byte[]](2..41)) -Rrsig $rrsig -Dnskey $dnskey | Should -BeFalse
 			}
 
-			It "throws for an unsupported algorithm instead of returning success" {
-				$dnskey = [DnsDnskeyRecord]::new(256, 3, 15, [byte[]](1..32))
-				{ Test-DnssecSignature -SignedData ([byte[]](1..4)) -Rrsig (Get-TestRrsig -Algorithm 15 -Signature ([byte[]](1..64))) -Dnskey $dnskey } | Should -Throw '*Unsupported*'
+			It "throws for an unsupported algorithm (Ed448, 16) instead of returning success" {
+				$dnskey = [DnsDnskeyRecord]::new(256, 3, 16, [byte[]](1..57))
+				{ Test-DnssecSignature -SignedData ([byte[]](1..4)) -Rrsig (Get-TestRrsig -Algorithm 16 -Signature ([byte[]](1..114))) -Dnskey $dnskey } | Should -Throw '*Unsupported*'
 			}
 
 			It "throws for a malformed RSA key" {

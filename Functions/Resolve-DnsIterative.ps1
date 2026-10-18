@@ -411,7 +411,20 @@
 		If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
 		try {
-			$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -RootServers $RootServers
+			$check = $null
+			if (@($Response.Answers).Count -eq 0) {
+				# 0.8: a negative answer is authenticated from its SOA + NSEC/NSEC3 records (see Test-DnssecNegativeResponse).
+				$negCheck = Test-DnssecNegativeResponse -Response $Response -QueryName $fqdn -QueryType $TypeCode -RootServers $RootServers
+				$check = [pscustomobject]@{
+					Status        = $negCheck.Status
+					Details       = @($negCheck.Details)
+					DnskeyRecords = @()
+					DsRecords     = @()
+				}
+			}
+			if ($null -eq $check) {
+				$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -RootServers $RootServers
+			}
 
 			if ($check.Status -in 'Unsigned', 'Insecure', 'Indeterminate') {
 				return @{
