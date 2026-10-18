@@ -52,7 +52,10 @@
 	$anchors = @()
 	foreach ($keyDigest in $xml.TrustAnchor.KeyDigest) {
 		# Only include valid (not revoked) anchors
-		if ($keyDigest.validUntil -and ([datetime]$keyDigest.validUntil -lt [datetime]::UtcNow)) {
+		# GetAttribute, not dot access: validUntil is an XML ATTRIBUTE that is absent on the current anchors, and
+		# dot access to a missing attribute throws under Set-StrictMode (0.8 fix - the update never completed).
+		$validUntil = $keyDigest.GetAttribute('validUntil')
+		if ($validUntil -and ([datetime]$validUntil -lt [datetime]::UtcNow)) {
 			Write-Verbose "Skipping expired anchor KeyTag $($keyDigest.KeyTag)"
 			continue
 		}

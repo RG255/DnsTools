@@ -1,4 +1,4 @@
-﻿# VENDORED from CommonScripts\0.2\Functions\Write-MyCatchAudit.ps1 by Sync-SharedUtilities [SHA256 849883A81DB5E18510996A6C454E79F67D5BF7D2FFD5490A28336715B6382552] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
+﻿# VENDORED from CommonScripts\0.2\Functions\Write-MyCatchAudit.ps1 by Sync-SharedUtilities [SHA256 CEBB5278BB2EFCD1CE53D5EFEC29B6AAC93873C7BCCDB334FA39D7418A4C4849] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
 Function Write-MyCatchAudit
 {
 	<#
@@ -157,6 +157,22 @@ Function Write-MyCatchAudit
 		}
 		Catch
 		{
+			# EXPECTED for a non-elevated session (2026-10-06): the persisted file is created by whichever process
+			# writes first, and once an ELEVATED process (e.g. the pipe server) has created it, only SYSTEM and
+			# Administrators can append. The entry is not lost: it is queued in $Global:MyCatchAuditUnpersisted,
+			# and a module that owns an elevated session relays the queue through it (VHDTools'
+			# Send-VHDCatchAuditPending, called when its session closes). Only a process with NO relay is warned.
+			If ($_.Exception -is [System.UnauthorizedAccessException] -and $Private:_jsonLine)
+			{
+				If (-not $Global:MyCatchAuditUnpersisted)
+				{ $Global:MyCatchAuditUnpersisted = [System.Collections.Generic.List[String]]::new() }
+				If ($Global:MyCatchAuditUnpersisted.Count -lt 500)
+				{ $Global:MyCatchAuditUnpersisted.Add([String]$Private:_jsonLine) }
+				If (-not $Global:MyCatchAuditRelayAvailable)
+				{ Write-Warning -Message ('Write-MyCatchAudit: this session cannot write the persisted catch-audit file (access denied) and has no elevated session to relay it through; the entry stays in memory only: {0}' -f $_.Exception.Message) }
+			}
+			Else
+			{
 			# Not silent - but calling Write-MyCatchAudit to report ITS OWN persist step failing is
 			# recursive by construction, so this checks the call stack first: if THIS is already a
 			# recursive call (i.e. Write-MyCatchAudit already appears once below this frame, meaning
@@ -168,6 +184,7 @@ Function Write-MyCatchAudit
 			{ Write-Warning -Message ('Write-MyCatchAudit: could not persist a catch-audit entry, and the recursive report of that also failed to persist: {0}' -f $_.Exception.Message) }
 			Else
 			{ Write-MyCatchAudit -Source 'Write-MyCatchAudit: failed to persist a catch-audit entry to disk' -ErrorRecord $_ }
+			}
 		}
 
 		If (-not $Teardown -and $env:MyCatchAuditVerbose -eq '1')

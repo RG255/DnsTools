@@ -46,7 +46,14 @@
 		# !! Verify any change here with at least THREE records in a scrambled order. With two
 		# reversed records "sorted" and "reversed" produce the SAME answer, and a 2-element test
 		# reports a false pass - that is exactly how this survived.
-		$rdataWire = $rr.RawRData
+		# Canonical RDATA (uncompressed, lower-cased embedded names) for real records; plain RawRData for
+		# anything else (test doubles). See DnsResourceRecord.GetCanonicalRData().
+		# Assigned inside each branch, NOT as `$x = if (...) {...}`: an if-expression result is unrolled into
+		# object[] and the byte[] is lost (AddRange(IEnumerable[byte]) then fails to convert).
+		if ($rr -is [DnsResourceRecord])
+		{[byte[]]$rdataWire = $rr.GetCanonicalRData()}
+		else
+		{[byte[]]$rdataWire = $rr.RawRData}
 		$records += ,[PSCustomObject]@{
 			RdataWire = $rdataWire
 			RdataKey  = [System.BitConverter]::ToString($rdataWire)

@@ -1,4 +1,4 @@
-﻿# VENDORED from CommonScripts\0.2\Functions\Get-MyError.ps1 by Sync-SharedUtilities [SHA256 F0DC7D6272EE74F74449E4D46C62F62266E71089F17115E2EA7D94ACB148FC10] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
+﻿# VENDORED from CommonScripts\0.2\Functions\Get-MyError.ps1 by Sync-SharedUtilities [SHA256 1E6BFFEDA4399FACF015D040207D3C59F8238724111AB97CC10DA96B48C26E8B] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
 Function Get-MyError
 {
 	<#
@@ -89,7 +89,9 @@ Function Get-MyError
 		Groups a batch of captured errors by exception type to see which ones recur most.
 
 		.NOTES
-		Version: 1.30 2026-09-15 - added automatic function-trace mirroring (see below).
+		Version: 1.31 2026-10-06 - FIXED: when more than -MaxErrors errors existed, the OLDEST were reported
+		(labelled "most recent"); now the newest -MaxErrors are, oldest-of-those first.
+		1.30 2026-09-15 - added automatic function-trace mirroring (see below).
 
 		.OUTPUTS
 		System.String - When -Return is specified, returns formatted error text.
@@ -133,7 +135,11 @@ Function Get-MyError
 		$Private:ParamLen       = $Indent + 18
 		$Private:NumberOfErrors = [int]$Global:Error.Count
 		$Private:ErrorsToShow   = [Math]::Min($Private:NumberOfErrors, [Math]::Max($MaxErrors, 0))
-		$Private:ErrorNumber    = $Private:NumberOfErrors - 1
+		# $Global:Error is newest-first (index 0 = newest). Start at the OLDEST of the errors to show, so the report
+		# is the newest $ErrorsToShow records in chronological order. Starting at NumberOfErrors - 1 (the oldest of
+		# ALL of them) reported the oldest records while claiming "most recent" whenever more than MaxErrors existed
+		# (measured 2026-10-06: 15 errors, MaxErrors 3 -> ProbeError01-03 shown instead of 13-15).
+		$Private:ErrorNumber    = $Private:ErrorsToShow - 1
 		$Local:InternalError    = $True
 		$Private:Err            = [System.Text.StringBuilder]''
 		$Private:Objects        = [System.Collections.Generic.List[PSCustomObject]]::new()
@@ -252,9 +258,10 @@ Function Get-MyError
 			# Handle internal errors during processing
 			if ([int]$Global:Error.Count -gt $Private:NumberOfErrors -and $Local:InternalError)
 			{
+				# The internal error landed at index 0 and shifted every record up one place, so the record just
+				# processed is now at ErrorNumber + 1 and the next older one sits at the SAME index: leave
+				# ErrorNumber and ErrorsToShow alone so the set that was chosen up front is the set shown.
 				$Private:NumberOfErrors = [int]$Global:Error.Count
-				$Private:ErrorsToShow   = [Math]::Min($Private:NumberOfErrors, [Math]::Max($MaxErrors, 0))
-				$Private:ErrorNumber    = [int]$Global:Error.Count - 2
 				$Local:InternalError    = $False
 				Write-MyLog -PathToLogFile $PathToLogFile -Message 'An error occurred processing the error collection'
 			}

@@ -369,8 +369,9 @@ function Format-DnsRecord
 		}
 		47 { # NSEC
 			if ($rdata) {
-				$props['NextName'] = $rdata.NextName
-				$props['TypeBitMaps'] = ($rdata.TypeBitMaps | ForEach-Object { Format-DnsTypeName -Type $_ }) -join ', '
+				# 0.8: class properties are NextDomainName / Types; NextName / TypeBitMaps do not exist and threw under StrictMode on any signed negative answer.
+				$props['NextName'] = $rdata.NextDomainName
+				$props['TypeBitMaps'] = ($rdata.Types | ForEach-Object { Format-DnsTypeName -Type $_ }) -join ', '
 			}
 		}
 		48 { # DNSKEY
@@ -398,8 +399,8 @@ function Format-DnsRecord
 				$optOut = if ($rdata.Flags -band 0x01) { 'Yes' } else { 'No' }
 				$props['Flags'] = "$($rdata.Flags) (OptOut: $optOut)"
 				$props['Iterations'] = $rdata.Iterations
-				if ($rdata.TypeBitMaps) {
-					$props['TypeBitMaps'] = ($rdata.TypeBitMaps | ForEach-Object { Format-DnsTypeName -Type $_ }) -join ', '
+				if ($rdata.Types) {
+					$props['TypeBitMaps'] = ($rdata.Types | ForEach-Object { Format-DnsTypeName -Type $_ }) -join ', '
 				}
 			}
 		}

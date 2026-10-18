@@ -131,6 +131,12 @@ class DnsBinaryReader {
 
 	[byte[]] ReadBytes([int]$count)
 	{
+		if ($count -lt 0)
+		{throw "Invalid DNS read length: $count"}
+		# A zero-length read must NOT use the range below: Position..(Position-1) is a DESCENDING range
+		# in PowerShell and returns two bytes, so an empty TXT string / empty RDATA read garbage.
+		if ($count -eq 0)
+		{return [byte[]]@()}
 		$this.EnsureAvailable($count)
 		$slice = $this.Buffer[$this.Position..($this.Position + $count - 1)]
 		$this.Position += $count
@@ -433,6 +439,13 @@ class DnsNsRecord {
 	{
 		$name = $r.ReadName()
 		return [DnsNsRecord]::new($name)
+	}
+
+	[byte[]]ToWire()
+	{
+		$w = [DnsBinaryWriter]::new()
+		$w.WriteName($this.NsName)
+		return $w.ToArray()
 	}
 }
 class DnsPtrRecord {
@@ -787,7 +800,7 @@ class DnsIpsecKeyRecord {
 		}
 
 		$remaining = $len - ($r.Position - $startPos)
-		$key = if ($remaining -gt 0) {$r.ReadBytes($remaining)} else {[byte[]]@()}
+		[byte[]]$key = $r.ReadBytes([Math]::Max(0, $remaining))
 
 		return [DnsIpsecKeyRecord]::new($prec, $gwType, $alg, $gw, $key)
 	}
@@ -821,7 +834,7 @@ class DnsOpenPgpKeyRecord {
 
 	static [DnsOpenPgpKeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$key = if ($len -gt 0) {$r.ReadBytes($len)} else {[byte[]]@()}
+		[byte[]]$key = $r.ReadBytes([Math]::Max(0, $len))
 		return [DnsOpenPgpKeyRecord]::new($key)
 	}
 
@@ -1030,10 +1043,8 @@ class DnsRrsigRecord {
 		if ($remaining -lt 0)
 		{throw "RRSIG parse overran RDLENGTH: consumed $bytesConsumed of $len"}
 
-		$sig = if ($remaining -gt 0)
-		{$r.ReadBytes($remaining)}
-		else
-		{[byte[]]@()}
+		# Typed statement-form assignment: an if-expression result is unrolled and an empty array becomes $null.
+		[byte[]]$sig = $r.ReadBytes($remaining)
 
 		return [DnsRrsigRecord]::new(
 			$typeC,$alg,$lbls,$orig,$exp,$inc,$tag,$signer,$sig
@@ -1211,10 +1222,9 @@ class DnsNsec3Record {
 		$flgs   = $r.ReadUInt8()
 		$iter    = $r.ReadUInt16BE()
 		$saltLen = $r.ReadUInt8()
-		$slt    = if ($saltLen -gt 0)
-		{$r.ReadBytes($saltLen)}
-		else
-		{[byte[]]@()}
+		# Typed statement-form assignment: with `$x = if (...) {...} else {[byte[]]@()}` an EMPTY salt (the common NSEC3
+		# case) was unrolled to $null, so Salt was $null instead of an empty array.
+		[byte[]]$slt = $r.ReadBytes($saltLen)
 
 		$hashLen  = $r.ReadUInt8()
 		$nxtHash = $r.ReadBytes($hashLen)
@@ -1331,7 +1341,10 @@ class DnsResourceRecord {
 		$start = $r.Position
 		$objValue = [DnsResourceRecord]::ParseRDataTyped($typeValue, $r, $rdlengthValue, $nameValue)
 		$r.Position = $start + $rdlengthValue
-		$rdataValue = $r.Buffer[$start..($start + $rdlengthValue - 1)]
+		# Zero-length RDATA: Buffer[start..(start-1)] is a descending range and would return two bytes.
+		[byte[]]$rdataValue = [byte[]]@()
+		if ($rdlengthValue -gt 0)
+		{$rdataValue = $r.Buffer[$start..($start + $rdlengthValue - 1)]}
 
 		return [DnsResourceRecord]::new(
 			$nameValue,
@@ -1408,15 +1421,28 @@ class DnsResourceRecord {
 		$w.WriteBytes($this.RawRData)
 	}
 
+	# RDATA in DNSSEC canonical form (RFC 4034 section 6.2). RawRData is a slice of the received packet, so
+	# for types that embed domain names it may contain compression pointers and mixed-case names, neither
+	# of which is what was signed. Rebuild those from the parsed object (ToWire writes uncompressed,
+	# lower-cased names). Types: NS(2) CNAME(5) SOA(6) PTR(12) MX(15) RP(17) SRV(33) NAPTR(35) DNAME(39).
+	# Everything else (A, AAAA, TXT, DNSKEY, DS, NSEC, RRSIG, ...) is already canonical as received.
+	[byte[]] GetCanonicalRData()
+	{
+		if ($this.Type -in 2, 5, 6, 12, 15, 17, 33, 35, 39 -and $null -ne $this.RDataObject)
+		{return $this.RDataObject.ToWire()}
+		return $this.RawRData
+	}
+
 	[byte[]] ToCanonicalWire()
 	{
+		$rdata = $this.GetCanonicalRData()
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteBytes( [byte[]](Get-DnssecCanonicalNameWire -name $this.Name) )
 		$w.WriteUInt16BE($this.Type)
 		$w.WriteUInt16BE($this.Class)
 		$w.WriteUInt32BE($this.Ttl)
-		$w.WriteUInt16BE([uint16]$this.RawRData.Length)
-		$w.WriteBytes($this.RawRData)
+		$w.WriteUInt16BE([uint16]$rdata.Length)
+		$w.WriteBytes($rdata)
 		return $w.ToArray()
 	}
 }
@@ -1580,6 +1606,7 @@ class DnsPacket {
 class DnsDotClient {
 	[string] $Server
 	[int]    $Port
+	[int]    $TimeoutMs = 5000
 
 	DnsDotClient([string]$server, [int]$port = 853)
 	{
@@ -1587,19 +1614,43 @@ class DnsDotClient {
 		$this.Port   = $port
 	}
 
+	# Reads exactly $count bytes. A TLS read can return fewer, and 0 means the peer closed the connection -
+	# the old loop spun forever on 0.
+	hidden [byte[]] ReadExact([System.IO.Stream]$stream, [int]$count)
+	{
+		$buf = New-Object -TypeName byte[] -ArgumentList $count
+		$got = 0
+		while ($got -lt $count)
+		{
+			$n = $stream.Read($buf, $got, $count - $got)
+			if ($n -le 0)
+			{throw 'connection closed before the full DNS response arrived'}
+			$got += $n
+		}
+		return $buf
+	}
+
 	[DnsPacket] Query([DnsPacket]$packet)
 	{
 		$queryBytes = $packet.ToArray()
+		$tcp = $null
+		$ssl = $null
 
 		try {
 			$tcp = New-Object -TypeName System.Net.Sockets.TcpClient
-			$tcp.Connect($this.Server, $this.Port)
+			$pending = $tcp.BeginConnect($this.Server, $this.Port, $null, $null)
+			if (-not $pending.AsyncWaitHandle.WaitOne($this.TimeoutMs))
+			{throw "connect to $($this.Server):$($this.Port) timed out after $($this.TimeoutMs) ms"}
+			$tcp.EndConnect($pending)
+			$tcp.ReceiveTimeout = $this.TimeoutMs
+			$tcp.SendTimeout = $this.TimeoutMs
 
-			$ssl = New-Object -TypeName System.Net.Security.SslStream -ArgumentList (
-				$tcp.GetStream(),
-				$false,
-				{param($s, $c, $ch, $e) return $true}
-			)
+			# No certificate callback: the platform's default validation applies (chain to a trusted root, name
+			# matches $this.Server, not expired). The old callback returned $true for everything, so any
+			# on-path attacker could impersonate the resolver.
+			$ssl = New-Object -TypeName System.Net.Security.SslStream -ArgumentList $tcp.GetStream()
+			$ssl.ReadTimeout = $this.TimeoutMs
+			$ssl.WriteTimeout = $this.TimeoutMs
 			$ssl.AuthenticateAsClient($this.Server)
 
 			$lenBytes = [BitConverter]::GetBytes([uint16]$queryBytes.Length)
@@ -1610,29 +1661,33 @@ class DnsDotClient {
 			$ssl.Write($queryBytes, 0, $queryBytes.Length)
 			$ssl.Flush()
 
-			$lenBuf = New-Object -TypeName byte[] -ArgumentList 2
-			$null = $ssl.Read($lenBuf, 0, 2)
+			$lenBuf = $this.ReadExact($ssl, 2)
 			if ([BitConverter]::IsLittleEndian)
 			{[Array]::Reverse($lenBuf)}
-			$respLen = [BitConverter]::ToUInt16($lenBuf, 0)
+			$respLen = [int][BitConverter]::ToUInt16($lenBuf, 0)
+			if ($respLen -lt 12)
+			{throw "invalid DNS response length $respLen"}
 
-			$resp = New-Object -TypeName byte[] -ArgumentList $respLen
-			$read = 0
-			while ($read -lt $respLen)
-			{$read += $ssl.Read($resp, $read, $respLen - $read)}
-
-			$ssl.Close()
-			$tcp.Close()
-
-			return [DnsPacket]::Parse($resp)
+			$resp = $this.ReadExact($ssl, $respLen)
+			$parsed = [DnsPacket]::Parse($resp)
+			if ($parsed.Header.Id -ne $packet.Header.Id)
+			{throw 'response ID does not match the query ID'}
+			return $parsed
 		}
 		catch {
 			throw "DoT query failed: $($_.Exception.Message)"
+		}
+		finally {
+			if ($null -ne $ssl)
+			{$ssl.Dispose()}
+			if ($null -ne $tcp)
+			{$tcp.Close()}
 		}
 	}
 }
 class DnsDohClient {
 	[string] $Endpoint
+	[int]    $TimeoutSeconds = 10
 
 	DnsDohClient([string]$endpoint)
 	{$this.Endpoint = $endpoint}
@@ -1640,9 +1695,15 @@ class DnsDohClient {
 	[DnsPacket] Query([DnsPacket]$packet)
 	{
 		$queryBytes = $packet.ToArray()
+		$httpClient = $null
+		$content = $null
+		$response = $null
 
 		try {
 			$httpClient = New-Object -TypeName System.Net.Http.HttpClient
+			$httpClient.Timeout = [TimeSpan]::FromSeconds($this.TimeoutSeconds)
+			# RFC 8484: some servers insist on an explicit Accept for the wire format.
+			$null = $httpClient.DefaultRequestHeaders.Accept.ParseAdd('application/dns-message')
 			$content = New-Object -TypeName System.Net.Http.ByteArrayContent -ArgumentList (,$queryBytes)
 			$content.Headers.ContentType = 'application/dns-message'
 
@@ -1651,10 +1712,21 @@ class DnsDohClient {
 			{throw "HTTP $($response.StatusCode)"}
 
 			$respBytes = $response.Content.ReadAsByteArrayAsync().Result
-			return [DnsPacket]::Parse($respBytes)
+			$parsed = [DnsPacket]::Parse($respBytes)
+			if ($parsed.Header.Id -ne $packet.Header.Id)
+			{throw 'response ID does not match the query ID'}
+			return $parsed
 		}
 		catch {
 			throw "DoH query failed: $($_.Exception.Message)"
+		}
+		finally {
+			if ($null -ne $response)
+			{$response.Dispose()}
+			if ($null -ne $content)
+			{$content.Dispose()}
+			if ($null -ne $httpClient)
+			{$httpClient.Dispose()}
 		}
 	}
 }
@@ -1783,7 +1855,7 @@ Function Publish-Variable
 						Scope = $Variables[$VarSet][$Item].Scope
 					}
 					If ($Params.Scope -inotmatch $VOConstant)
-					{Remove-Variable @Params -Force}
+					{Remove-Variable @Params -Force -WhatIf:$false}
 				}
 				$Params = @{
 					Name   = $Item
@@ -1791,7 +1863,21 @@ Function Publish-Variable
 					Option = $Variables[$VarSet][$Item].Option
 					Scope  = $Variables[$VarSet][$Item].Scope
 				}
-				New-Variable @Params -ErrorAction Stop
+				# -WhatIf:$false on BOTH this and the Remove-Variable above (2026-09-27; same defect found live
+				# in NamedPipe 0.15 and fixed across every live module the same day). New-Variable and
+				# Remove-Variable honour ShouldProcess, so they inherit $WhatIfPreference - which is set for the
+				# WHOLE SCOPE, including everything downstream, as soon as any caller runs a
+				# SupportsShouldProcess script with -WhatIf. The module then IMPORTS BUT DOES NOT INITIALISE:
+				# every variable skipped, Export-ModuleMember throwing on each missing one, and the failure
+				# finally surfacing as a bogus "X is not recognized" - a half-loaded module masquerading as a
+				# missing function.
+				#
+				# Creating a module's OWN internal variables at import time is not a user-visible state change
+				# that -WhatIf should ever preview.
+				#
+				# EDIT THIS TAIL, NOT DnsTools.psm1 - that file is GENERATED by Helpers\GenPsm1File.ps1, and a
+				# hand-edit there is silently lost on the next regeneration.
+				New-Variable @Params -ErrorAction Stop -WhatIf:$false
 				Export-ModuleMember -Variable $Item -ErrorAction Stop
 				$var = Get-Variable -Name VInfoOn -Scope Local -ErrorAction SilentlyContinue
 				if ($var -and $var.Value -is [bool] -and $var.Value)

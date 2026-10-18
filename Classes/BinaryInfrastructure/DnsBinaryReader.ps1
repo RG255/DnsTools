@@ -54,6 +54,12 @@
 
 	[byte[]] ReadBytes([int]$count)
 	{
+		if ($count -lt 0)
+		{throw "Invalid DNS read length: $count"}
+		# A zero-length read must NOT use the range below: Position..(Position-1) is a DESCENDING range
+		# in PowerShell and returns two bytes, so an empty TXT string / empty RDATA read garbage.
+		if ($count -eq 0)
+		{return [byte[]]@()}
 		$this.EnsureAvailable($count)
 		$slice = $this.Buffer[$this.Position..($this.Position + $count - 1)]
 		$this.Position += $count

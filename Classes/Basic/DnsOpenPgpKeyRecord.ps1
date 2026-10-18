@@ -6,7 +6,7 @@
 
 	static [DnsOpenPgpKeyRecord] Parse([DnsBinaryReader]$r, [int]$len)
 	{
-		$key = if ($len -gt 0) {$r.ReadBytes($len)} else {[byte[]]@()}
+		[byte[]]$key = $r.ReadBytes([Math]::Max(0, $len))
 		return [DnsOpenPgpKeyRecord]::new($key)
 	}
 

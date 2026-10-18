@@ -60,10 +60,9 @@
 		$flgs   = $r.ReadUInt8()
 		$iter    = $r.ReadUInt16BE()
 		$saltLen = $r.ReadUInt8()
-		$slt    = if ($saltLen -gt 0)
-		{$r.ReadBytes($saltLen)}
-		else
-		{[byte[]]@()}
+		# Typed statement-form assignment: with `$x = if (...) {...} else {[byte[]]@()}` an EMPTY salt (the common NSEC3
+		# case) was unrolled to $null, so Salt was $null instead of an empty array.
+		[byte[]]$slt = $r.ReadBytes($saltLen)
 
 		$hashLen  = $r.ReadUInt8()
 		$nxtHash = $r.ReadBytes($hashLen)

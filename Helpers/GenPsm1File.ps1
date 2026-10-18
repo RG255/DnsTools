@@ -55,28 +55,34 @@ $ClassFiles = @(
 $OutFile = "$ModuleRoot\DnsTools.psm1"
 $TailFile = "$PSScriptRoot\DnsTools-psm1-Tail.ps1"
 
-If (Test-Path -Path $OutFile) {
-	Remove-Item -Path $OutFile
-}
+# Built in memory and written ONCE with an explicit UTF-8 BOM and CRLF, so the result is byte-identical whichever
+# host runs this (Out-File -Encoding UTF8 writes a BOM under Windows PowerShell 5.1 but NOT under PowerShell 7, which
+# made the output depend on the host). The release chain and the test wrappers run this before anything else.
+$Utf8 = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
+$Lines = New-Object -TypeName System.Collections.Generic.List[string]
 
-'#requires -Version 5.0' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'Set-StrictMode -Version Latest' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'# ============================================================' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'# Load Classes' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'# ============================================================' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
+$Lines.Add('#requires -Version 5.0')
+$Lines.Add('')
+$Lines.Add('Set-StrictMode -Version Latest')
+$Lines.Add('')
+$Lines.Add('# ============================================================')
+$Lines.Add('# Load Classes')
+$Lines.Add('# ============================================================')
+$Lines.Add('')
 
 foreach ($item in $ClassFiles) {
-	if (Test-Path $item) {
-		Get-Content -Path $item | Out-File -Append -FilePath $OutFile -Encoding UTF8
+	if (Test-Path -Path $item) {
+		$Lines.AddRange([string[]][System.IO.File]::ReadAllLines($item, $Utf8))
 	} else {
-		Write-Warning "Class file not found: $item"
+		Write-Error "Class file not found: $item"
+		exit 1
 	}
 }
 
-'' | Out-File -Append -FilePath $OutFile -Encoding UTF8
-Get-Content -Path $TailFile | Out-File -Append -FilePath $OutFile -Encoding UTF8
+$Lines.Add('')
+$Lines.AddRange([string[]][System.IO.File]::ReadAllLines($TailFile, $Utf8))
+
+$Text = ($Lines -join "`r`n") + "`r`n"
+[System.IO.File]::WriteAllText($OutFile, $Text, (New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $true))
 
 Write-Host "Generated: $OutFile" -ForegroundColor Green

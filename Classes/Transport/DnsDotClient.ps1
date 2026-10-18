@@ -1,6 +1,7 @@
 ﻿class DnsDotClient {
 	[string] $Server
 	[int]    $Port
+	[int]    $TimeoutMs = 5000
 
 	DnsDotClient([string]$server, [int]$port = 853)
 	{
@@ -8,19 +9,43 @@
 		$this.Port   = $port
 	}
 
+	# Reads exactly $count bytes. A TLS read can return fewer, and 0 means the peer closed the connection -
+	# the old loop spun forever on 0.
+	hidden [byte[]] ReadExact([System.IO.Stream]$stream, [int]$count)
+	{
+		$buf = New-Object -TypeName byte[] -ArgumentList $count
+		$got = 0
+		while ($got -lt $count)
+		{
+			$n = $stream.Read($buf, $got, $count - $got)
+			if ($n -le 0)
+			{throw 'connection closed before the full DNS response arrived'}
+			$got += $n
+		}
+		return $buf
+	}
+
 	[DnsPacket] Query([DnsPacket]$packet)
 	{
 		$queryBytes = $packet.ToArray()
+		$tcp = $null
+		$ssl = $null
 
 		try {
 			$tcp = New-Object -TypeName System.Net.Sockets.TcpClient
-			$tcp.Connect($this.Server, $this.Port)
+			$pending = $tcp.BeginConnect($this.Server, $this.Port, $null, $null)
+			if (-not $pending.AsyncWaitHandle.WaitOne($this.TimeoutMs))
+			{throw "connect to $($this.Server):$($this.Port) timed out after $($this.TimeoutMs) ms"}
+			$tcp.EndConnect($pending)
+			$tcp.ReceiveTimeout = $this.TimeoutMs
+			$tcp.SendTimeout = $this.TimeoutMs
 
-			$ssl = New-Object -TypeName System.Net.Security.SslStream -ArgumentList (
-				$tcp.GetStream(),
-				$false,
-				{param($s, $c, $ch, $e) return $true}
-			)
+			# No certificate callback: the platform's default validation applies (chain to a trusted root, name
+			# matches $this.Server, not expired). The old callback returned $true for everything, so any
+			# on-path attacker could impersonate the resolver.
+			$ssl = New-Object -TypeName System.Net.Security.SslStream -ArgumentList $tcp.GetStream()
+			$ssl.ReadTimeout = $this.TimeoutMs
+			$ssl.WriteTimeout = $this.TimeoutMs
 			$ssl.AuthenticateAsClient($this.Server)
 
 			$lenBytes = [BitConverter]::GetBytes([uint16]$queryBytes.Length)
@@ -31,24 +56,27 @@
 			$ssl.Write($queryBytes, 0, $queryBytes.Length)
 			$ssl.Flush()
 
-			$lenBuf = New-Object -TypeName byte[] -ArgumentList 2
-			$null = $ssl.Read($lenBuf, 0, 2)
+			$lenBuf = $this.ReadExact($ssl, 2)
 			if ([BitConverter]::IsLittleEndian)
 			{[Array]::Reverse($lenBuf)}
-			$respLen = [BitConverter]::ToUInt16($lenBuf, 0)
+			$respLen = [int][BitConverter]::ToUInt16($lenBuf, 0)
+			if ($respLen -lt 12)
+			{throw "invalid DNS response length $respLen"}
 
-			$resp = New-Object -TypeName byte[] -ArgumentList $respLen
-			$read = 0
-			while ($read -lt $respLen)
-			{$read += $ssl.Read($resp, $read, $respLen - $read)}
-
-			$ssl.Close()
-			$tcp.Close()
-
-			return [DnsPacket]::Parse($resp)
+			$resp = $this.ReadExact($ssl, $respLen)
+			$parsed = [DnsPacket]::Parse($resp)
+			if ($parsed.Header.Id -ne $packet.Header.Id)
+			{throw 'response ID does not match the query ID'}
+			return $parsed
 		}
 		catch {
 			throw "DoT query failed: $($_.Exception.Message)"
+		}
+		finally {
+			if ($null -ne $ssl)
+			{$ssl.Dispose()}
+			if ($null -ne $tcp)
+			{$tcp.Close()}
 		}
 	}
 }

@@ -34,10 +34,25 @@
 	if (-not $trustAnchorsVar)
 	{$script:TrustAnchors = @{}}
 
-	$script:TrustAnchors[$Zone] = [pscustomobject]@{
-		KeyTag     = $keyTag
-		Algorithm  = $Algorithm
-		DigestType = $DigestType
-		DigestHex  = $DigestHex.ToLower()
+	# Append to the zone's anchor list (a zone can have several). An identical anchor is not added twice.
+	$zoneKey = $Zone.Trim().ToLower()
+	if ($zoneKey -eq '')
+	{$zoneKey = '.'}
+
+	$existing = @()
+	if ($script:TrustAnchors.ContainsKey($zoneKey))
+	{$existing = @($script:TrustAnchors[$zoneKey])}
+
+	$duplicate = @($existing | Where-Object -FilterScript {
+			$_.KeyTag -eq $keyTag -and $_.Algorithm -eq $Algorithm -and $_.DigestType -eq $DigestType -and $_.DigestHex -eq $DigestHex.ToLower()
+		})
+	if ($duplicate.Count -eq 0)
+	{
+		$script:TrustAnchors[$zoneKey] = @($existing) + @([pscustomobject]@{
+				KeyTag     = $keyTag
+				Algorithm  = $Algorithm
+				DigestType = $DigestType
+				DigestHex  = $DigestHex.ToLower()
+			})
 	}
 }

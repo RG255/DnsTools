@@ -1,22 +1,29 @@
 ﻿function Resolve-DnssecChain
 {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Validates the complete DNSSEC chain of trust for a domain name.
 
-	.DESCRIPTION
-		Walks the DNSSEC chain from the root zone through all intermediate zones to validate the full chain of trust.
+		.DESCRIPTION
+		Resolves the name and validates the answer with Resolve-Dnssec, which authenticates each signing zone's
+		DNSKEY RRset from the configured root trust anchor down (root DNSKEY anchored, then for each zone a
+		parent-signed DS, a DS-authenticated DNSKEY, and a DNSKEY RRset signed by that key). Chain holds the
+		authenticated DNSKEY records for every signing zone involved, keyed by zone name.
 
-	.PARAMETER name
+		0.8: the previous version loaded the root anchor and then never used it, and walked every label of the
+		host name as if it were a zone. The walk is now driven by the RRSIG signer names, so a host name that
+		is not a zone apex no longer breaks it.
+
+		.PARAMETER name
 		The fully qualified domain name to validate.
 
-	.PARAMETER type
-		The DNS record type to query (default: 1 = A record).
+		.PARAMETER type
+		The DNS record type to query (default: A).
 
-	.PARAMETER RootServers
+		.PARAMETER RootServers
 		Array of root server IP addresses to use for resolution (defaults to module-configured root servers).
 
-	.PARAMETER Trace
+		.PARAMETER Trace
 		Enable verbose trace output for debugging DNSSEC validation.
 	#>
 	[CmdletBinding()]
@@ -34,60 +41,29 @@
 
 	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
-	# 2026-09-15: whole body wrapped in Try/Catch, same reasoning and same convention as the identical
-	# fix in Resolve-Dnssec.ps1 (see that file's comment) - this function had no error handling anywhere
-	# despite already returning a structured Valid/Reason/Chain object for every controlled failure.
 	try {
 
-		# Convert type name to code if needed
-		$TypeCode = ConvertTo-DnsTypeCode -Type $type
+		$leaf = Resolve-Dnssec -name $name -type $type -RootServers $RootServers -Trace:$Trace
 
-		# 1. Load root trust anchor (hard-coded DNSKEY RRset for ".")
-		$rootKeys = Get-RootTrustAnchor
-
-		# 2. Walk labels from right to left:
-		#    ".", "com.", "cloudflare.com."
-		$zones = Get-DnssecZonePath -Name $name  # returns [".", "com.", "cloudflare.com."]
-
-		$validatedZones = @{}
-		$validatedZones['.'] = $rootKeys  # trust anchor
-
-		for ($i = 1; $i -lt $zones.Count; $i++)
-		{
-			$child  = $zones[$i]
-			$parent = $zones[$i - 1]
-
-			$zoneResult = Resolve-DnssecZone -Zone $child -ParentZone $parent -RootServers $RootServers -Trace:$Trace
-
-			if (-not $zoneResult.Valid)
-			{
-				return [pscustomobject]@{
-					Valid  = $false
-					Reason = "Zone validation failed for $child : $($zoneResult.Reason)"
-					Chain  = $validatedZones
-				}
-			}
-
-			$validatedZones[$child] = $zoneResult.Dnskeys
-		}
-
-		# 3. Finally, validate the RRset at $Name using the last zone's keys
-		$leaf = Resolve-Dnssec -name $name -type $TypeCode -RootServers $RootServers -Trace:$Trace
+		$chain = if ($leaf.PSObject.Properties['Chain'])
+		{$leaf.Chain}
+		else
+		{@{}}
 
 		if (-not $leaf.Valid)
 		{
 			return [pscustomobject]@{
 				Valid  = $false
-				Reason = "Leaf RRset validation failed: $($leaf.Reason)"
-				Chain  = $validatedZones
+				Reason = "Validation failed: $($leaf.Reason)"
+				Chain  = $chain
 				Leaf   = $leaf
 			}
 		}
 
-		[pscustomobject]@{
+		return [pscustomobject]@{
 			Valid  = $true
 			Reason = 'Full chain validated'
-			Chain  = $validatedZones
+			Chain  = $chain
 			Leaf   = $leaf
 		}
 

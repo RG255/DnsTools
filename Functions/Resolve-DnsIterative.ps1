@@ -110,6 +110,10 @@
 		[Parameter(DontShow)]
 		[switch]$Raw,
 
+		# Internal: CNAME-follow depth. A CNAME loop (a -> b -> a) used to recurse without limit.
+		[Parameter(DontShow)]
+		[int]$Depth = 0,
+
 		[switch]$ValidateDnssec,
 
 		[Parameter(Mandatory, ParameterSetName = 'DualStackSet')]
@@ -123,6 +127,17 @@
 	)
 
 	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
+
+	# CNAME chain limit (resolvers conventionally stop at 8-16); reached only by a loop or a pathological chain.
+	if ($Depth -gt 8) {
+		return [PSCustomObject]@{
+			QueryName = $Name
+			QueryType = $null
+			Status    = 'BailOut'
+			Reason    = "CNAME chain longer than 8 (loop?) while resolving $Name"
+			Message   = "CNAME chain longer than 8 (loop?) while resolving $Name"
+		}
+	}
 
 	# Parameter syntax validation, moved out of [ValidateScript(...)] attributes and into the function
 	# body 2026-09-15 (see .DESCRIPTION) so a caller-usage mistake reports as Status='InvalidArgument'
@@ -243,11 +258,9 @@
 		# First check if both have Success status (BailOut results don't have Server/Flags/RCode)
 		$bothSuccess = ($resultA.Status -eq 'Success' -and $resultAAAA.Status -eq 'Success')
 
-		$canMerge = $bothSuccess -and (
-			$resultA.Server -eq $resultAAAA.Server -and
-			$resultA.Flags -eq $resultAAAA.Flags -and
-			$resultA.RCode -eq $resultAAAA.RCode
-		)
+		# 0.8: only the response code has to agree. Requiring the SAME server and flags meant the merge almost
+		# never happened, because each of the two lookups picks its own random root and authoritative server.
+		$canMerge = $bothSuccess -and ($resultA.RCode -eq $resultAAAA.RCode)
 
 		if ($canMerge) {
 			# Merge the answers from both queries
@@ -260,7 +273,7 @@
 				QueryName       = $resultA.QueryName
 				QueryType       = 'A+AAAA'
 				Status          = $resultA.Status
-				Server          = $resultA.Server
+				Server          = $(if ($resultA.Server -eq $resultAAAA.Server) { $resultA.Server } else { 'A: {0}; AAAA: {1}' -f $resultA.Server, $resultAAAA.Server })
 				Flags           = $resultA.Flags
 				OpCode          = $resultA.OpCode
 				RCode           = $resultA.RCode
@@ -272,9 +285,15 @@
 				Additional      = $resultA.Additional
 			}
 
-			# Copy DNSSEC info if present (use A result's DNSSEC status)
+			# Copy DNSSEC info if present. The two lookups are validated separately; when they disagree the merged
+			# result must carry the WORSE status (a Secure A must not hide a Bogus AAAA).
 			if ($resultA.PSObject.Properties['DnssecStatus']) {
-				$merged | Add-Member -NotePropertyName 'DnssecStatus' -NotePropertyValue $resultA.DnssecStatus -Force
+				$severity = @('Secure', 'Insecure', 'Unsigned', 'Indeterminate', 'Bogus')
+				$mergedStatus = $resultA.DnssecStatus
+				if ($resultAAAA.PSObject.Properties['DnssecStatus'] -and [array]::IndexOf($severity, [string]$resultAAAA.DnssecStatus) -gt [array]::IndexOf($severity, [string]$mergedStatus)) {
+					$mergedStatus = $resultAAAA.DnssecStatus
+				}
+				$merged | Add-Member -NotePropertyName 'DnssecStatus' -NotePropertyValue $mergedStatus -Force
 			}
 			if ($resultA.PSObject.Properties['DnssecDetails']) {
 				$merged | Add-Member -NotePropertyName 'DnssecDetails' -NotePropertyValue $resultA.DnssecDetails -Force
@@ -297,7 +316,7 @@
 			} elseif ($resultAAAA.Status -ne 'Success') {
 				"AAAA query failed: $($resultAAAA.Message)"
 			} else {
-				'Results could not be merged due to differing server metadata'
+				'Results could not be merged: the A and AAAA response codes differ'
 			}
 
 			return [PSCustomObject]@{
@@ -377,7 +396,11 @@
 		return $formatted
 	}
 
-	# Helper function to validate DNSSEC signatures on response
+	# Helper function to validate DNSSEC signatures on response.
+	# 0.8: delegates to Test-DnssecResponseSignature. The earlier inline version fetched the DNSKEY from the
+	# same untrusted resolution, never matched the DS it fetched, never checked the signer against the owner
+	# name and only looked at RRSIGs that were present - so a forged answer with its own DNSKEY and RRSIGs
+	# was reported 'Secure'. Now every answer RRset must verify against keys authenticated to a trust anchor.
 	function ValidateDnssecResponse {
 		param(
 			$Response,
@@ -387,104 +410,34 @@
 
 		If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
-		$details = @()
-		$overallValid = $true
-
-		# Check if response contains RRSIG records
-		$rrsigRecords = @($Response.Answers | Where-Object { $_.Type -eq 46 })
-		if ($rrsigRecords.Count -eq 0) {
-			return @{
-				Status = 'Unsigned'
-				Details = @('No RRSIG records in response - response is not signed')
-			}
-		}
-
-		$details += "Found $($rrsigRecords.Count) RRSIG record(s) in answer"
-
-		# Get the zone name from the first RRSIG signer
-		$signerName = $rrsigRecords[0].RDataObject.SignerName
-		$details += "Signer zone: $signerName"
-
 		try {
-			# Query for DNSKEY records of the signer zone via iterative resolution
-			$dnskeyResult = Resolve-DnsIterative -Name $signerName -Type 48 -RootServers $RootServers -Raw
+			$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -RootServers $RootServers
 
-			if ($dnskeyResult.Status -ne 'Final') {
+			if ($check.Status -in 'Unsigned', 'Insecure', 'Indeterminate') {
 				return @{
-					Status = 'Indeterminate'
-					Details = @("Could not retrieve DNSKEY for $signerName : $($dnskeyResult.Reason)")
+					Status = $check.Status
+					Details = @($check.Details)
 				}
 			}
 
-			$dnskeyRecords = @($dnskeyResult.Response.Answers | Where-Object { $_.Type -eq 48 })
-			if ($dnskeyRecords.Count -eq 0) {
-				return @{
-					Status = 'Indeterminate'
-					Details = @("No DNSKEY records found for $signerName")
-				}
-			}
-
-			$details += "Retrieved $($dnskeyRecords.Count) DNSKEY record(s) from $signerName"
-
-			# Format DNSKEY records for output
 			$formattedDnskeys = @()
-			foreach ($dnskey in $dnskeyRecords) {
+			foreach ($dnskey in @($check.DnskeyRecords)) {
 				$formattedDnskeys += Format-DnsRecord -Record $dnskey -Section 'Answer'
 			}
-
-			# Query for DS records from parent zone
 			$formattedDs = @()
-			try {
-				$dsResult = Resolve-DnsIterative -name $signerName -type 43 -RootServers $RootServers -Raw
-				if ($dsResult.Status -eq 'Final') {
-					$dsRecords = @($dsResult.Response.Answers | Where-Object { $_.Type -eq 43 })
-					if ($dsRecords.Count -gt 0) {
-						$details += "Retrieved $($dsRecords.Count) DS record(s) from parent zone"
-						foreach ($ds in $dsRecords) {
-							$formattedDs += Format-DnsRecord -Record $ds -Section 'Answer'
-						}
-					}
-				}
-			}
-			catch {
-				$details += "Could not retrieve DS records: $($_.Exception.Message)"
-			}
-
-			# Validate each RRSIG
-			foreach ($rrsig in $rrsigRecords) {
-				$rrsigData = $rrsig.RDataObject
-				$typeCoveredName = Format-DnsTypeName -Type $rrsigData.TypeCovered
-
-				# Get the RRset that this RRSIG covers
-				$coveredRrset = @($Response.Answers | Where-Object {
-						$_.Type -eq $rrsigData.TypeCovered -and
-						$_.Name.TrimEnd('.').ToLower() -eq $rrsig.Name.TrimEnd('.').ToLower()
-					})
-
-				if ($coveredRrset.Count -eq 0) {
-					$details += "RRSIG KeyTag $($rrsigData.KeyTag) covers $typeCoveredName but no matching records found"
-					continue
-				}
-
-				# Validate the RRSIG
-				$validationResult = Test-DnssecRrsig -Rrsig $rrsigData -Rrset $coveredRrset -DnskeyRrset $dnskeyRecords
-
-				if ($validationResult.Valid) {
-					$details += "RRSIG KeyTag $($rrsigData.KeyTag) covering $typeCoveredName : VALID"
-				} else {
-					$details += "RRSIG KeyTag $($rrsigData.KeyTag) covering $typeCoveredName : INVALID - $($validationResult.Reason)"
-					$overallValid = $false
-				}
+			foreach ($ds in @($check.DsRecords)) {
+				$formattedDs += Format-DnsRecord -Record $ds -Section 'Answer'
 			}
 
 			return @{
-				Status = if ($overallValid) { 'Secure' } else { 'Bogus' }
-				Details = $details
+				Status = $check.Status
+				Details = @($check.Details)
 				DnskeyRecords = $formattedDnskeys
 				DsRecords = $formattedDs
 			}
 		}
 		catch {
+			Write-MyCatchAudit -Source 'Resolve-DnsIterative: ValidateDnssecResponse failed' -ErrorRecord $_
 			return @{
 				Status = 'Indeterminate'
 				Details = @("DNSSEC validation error: $($_.Exception.Message)")
@@ -603,7 +556,7 @@
 						Write-Verbose -Message "Following CNAME: $fqdn -> $cnameTarget"
 
 						# Recursively resolve the CNAME target
-						$cnameResult = Resolve-DnsIterative -name $cnameTarget -type $TypeCode -RootServers $RootServers -Raw
+						$cnameResult = Resolve-DnsIterative -name $cnameTarget -type $TypeCode -RootServers $RootServers -Trace:$Trace -UseGlueOnly:$UseGlueOnly -Depth ($Depth + 1) -Raw
 
 						if ($cnameResult.Status -eq 'Final') {
 							# Combine the CNAME chain with the final answer
@@ -625,8 +578,38 @@
 					return (ReturnResult -RawResult $rawResult)
 				}
 
+				# 0.8: an answer with no records is not always a referral. Two shapes end the resolution:
+				#   - a definitive negative: RCODE 3 (NXDOMAIN), or NOERROR with an SOA in Authority and no NS
+				#     referral (NODATA - the name exists, not this type). Before 0.8 these matched no branch, the
+				#     server set repeated, and the function bailed out with "Server-set cycle detected", so
+				#     "no such name" and "no DS" were reported as failures.
+				#   - a server fault (SERVFAIL / REFUSED / FORMERR / NOTIMP): this server cannot answer, try
+				#     the next one rather than treat the reply as an answer.
+				$rcode = [int]($resp.Header.Flags -band 0x000F)
+				$authNs = @($resp.Authority | Where-Object { $_.Type -eq 2 })
+				$authSoa = @($resp.Authority | Where-Object { $_.Type -eq 6 })
+				if ($rcode -in 1, 2, 4, 5) {
+					$lastServerError = "server returned RCODE $rcode (from $server)"
+					Write-Verbose -Message "Resolve-DnsIterative: $lastServerError - trying next server"
+					continue
+				}
+				if ($rcode -eq 3 -or ($authSoa.Count -gt 0 -and $authNs.Count -eq 0)) {
+					$negative = if ($rcode -eq 3) { 'NXDOMAIN' } else { 'NODATA' }
+					$rawResult = [pscustomobject]@{
+						Status   = 'Final'
+						Response = $resp
+						Reason   = "Answer found from $server"
+						Negative = $negative
+					}
+					return (ReturnResult -RawResult $rawResult)
+				}
+
 				# Glue
-				$glue = @($resp.Additional | Where-Object { $_.Type -in 1,28 })
+				# 0.8: only glue for a nameserver the referral actually names. Any A/AAAA in Additional used to be
+				# accepted as the next server, so a hostile or compromised server could steer resolution to an
+				# address of its choosing by stuffing the Additional section.
+				$referredNs = @($resp.Authority | Where-Object { $_.Type -eq 2 -and $_.RDataObject } | ForEach-Object { $_.RDataObject.NsName.TrimEnd('.').ToLower() })
+				$glue = @($resp.Additional | Where-Object { $_.Type -in 1,28 -and $referredNs -contains $_.Name.TrimEnd('.').ToLower() })
 				if ($glue.Count -gt 0) {
 					$glueAddrs = @($glue |
 							ForEach-Object {

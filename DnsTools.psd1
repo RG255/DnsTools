@@ -8,12 +8,12 @@
 
 @{
 	RootModule    = 'DnsTools.psm1'
-	ModuleVersion = '0.7'
+	ModuleVersion = '0.8'
 	GUID          = '8c594981-48d7-49c2-aa08-6ac52eaffec6'
 	Author        = 'Ray'
 	CompanyName   = 'Ray Labs'
 	Copyright     = '(c) 2026 Ray. All rights reserved.'
-	Description   = 'A full DNS, DNSSEC, DoT, DoH, and iterative resolver toolkit for PowerShell. v0.7: PSScriptAnalyzer cleanup - 4 exported functions renamed to singular/reworded nouns (breaking change, see CHANGELOG.md).'
+	Description   = 'A full DNS, DNSSEC, DoT, DoH, and iterative resolver toolkit for PowerShell. v0.8: DNSSEC validation fixes (see CHANGELOG.md).'
 	PowerShellVersion = '5.0'
 	# Explicit exports so PowerShell AUTO-LOADS this module on first use of any command
 	# (no manual Import-Module). These are all cross-platform (no FunctionsWindows), so

@@ -39,7 +39,7 @@
 		[int]$Iterations,
 
 		[Parameter(Mandatory)]
-		[byte[]]$salt
+		[AllowEmptyCollection()][byte[]]$salt
 	)
 
 	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }

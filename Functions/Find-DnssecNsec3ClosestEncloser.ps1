@@ -34,7 +34,7 @@
 		[int]$Iterations,
 
 		[Parameter(Mandatory)]
-		[byte[]]$salt,
+		[AllowEmptyCollection()][byte[]]$salt,
 
 		[switch]$Trace
 	)

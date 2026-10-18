@@ -383,6 +383,21 @@ $script:FunctionExportTable = @{
 	'Test-DnssecChain' = $false
 	# Validates full DNSSEC chain of trust.
 
+	'Test-DnsZoneApex' = $false
+	# 0.8: true when a name owns its own SOA (a zone apex); used to build the zone path (internal).
+
+	'Get-DnssecTrustedKey' = $false
+	# 0.8: authenticates a zone's DNSKEY RRset up the chain to a configured trust anchor (internal).
+
+	'Get-DnssecDsMatchedKey' = $false
+	# 0.8: returns the DNSKEYs a DS RRset authenticates (internal).
+
+	'Test-DnssecRrsetSignature' = $false
+	# 0.8: an RRset has a valid RRSIG from a trusted key, signer checked (internal).
+
+	'Test-DnssecResponseSignature' = $false
+	# 0.8: validates every answer RRset against authenticated keys (internal; used by Resolve-DnsIterative -ValidateDnssec and Resolve-Dnssec).
+
 	'Test-DnssecNsec3Nodata' = $false
 	# Validates NSEC3-based NODATA proofs.
 

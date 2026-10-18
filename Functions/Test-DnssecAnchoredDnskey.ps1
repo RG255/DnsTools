@@ -27,18 +27,28 @@
 	if (-not $script:TrustAnchors.ContainsKey($Zone))
 	{return $false}
 
-	$anchor = $script:TrustAnchors[$Zone]
+	# A zone can hold several anchors (the root has more than one KSK digest): any match anchors the key.
+	foreach ($anchor in @($script:TrustAnchors[$Zone]))
+	{
+		if ($null -eq $anchor)
+		{continue}
 
-	# HARDENING GOES HERE
-	if ($null -eq $anchor)
-	{return $false}
+		if ($Dnskey.KeyTag -ne $anchor.KeyTag)
+		{continue}
+		if ($Dnskey.Algorithm -ne $anchor.Algorithm)
+		{continue}
 
-	if ($Dnskey.KeyTag -ne $anchor.KeyTag)
-	{return $false}
-	if ($Dnskey.Algorithm -ne $anchor.Algorithm)
-	{return $false}
+		try
+		{$digest = Get-DnssecKeyDigestHex -OwnerName $Zone -Dnskey $Dnskey -DigestType $anchor.DigestType}
+		catch
+		{
+			Write-MyCatchAudit -Source 'Test-DnssecAnchoredDnskey: digest computation failed for one anchor - trying the next is correct, the key is simply not anchored by this one' -ErrorRecord $_
+			continue
+		}
 
-	$digest = Get-DnssecKeyDigestHex -OwnerName $Zone -Dnskey $Dnskey -DigestType $anchor.DigestType
+		if ($digest -ieq $anchor.DigestHex)
+		{return $true}
+	}
 
-	return ($digest -eq $anchor.DigestHex)
+	return $false
 }

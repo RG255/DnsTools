@@ -1,5 +1,59 @@
 # DnsTools Changelog
 
+## v0.8
+
+### Fixed (DNSSEC validation failed open or failed valid answers)
+- `Resolve-Dnssec` and `Test-DnssecChain` tested the object returned by `Test-DnssecRrsig` (always truthy) instead of its
+  `.Valid`, so an invalid signature was never rejected.
+- `Resolve-DnsIterative -ValidateDnssec` reported `Secure` after checking RRSIGs against a DNSKEY fetched from the same
+  untrusted resolution. Validation now authenticates keys up the DS chain to a configured trust anchor
+  (new internal `Get-DnssecTrustedKey` / `Test-DnssecResponseSignature` / `Test-DnssecRrsetSignature` / `Get-DnssecDsMatchedKey`);
+  every answer RRset must verify, the signer must be the owner name or an ancestor, an unsigned RRset is reported as
+  `Indeterminate` rather than `Secure`.
+- `Test-DnssecValidation`: a DNSKEY RRset with no RRSIG was reported SECURE; the root was declared trusted without matching the
+  trust anchor; the DS RRset signature was never checked; any key in the unauthenticated DNSKEY set could sign it.
+- `Resolve-Dnssec` / `Resolve-DnssecChain` / `Resolve-DnssecZone` rewritten on the same trust walk (the walk is driven by RRSIG
+  signer names, so a host name that is not a zone apex no longer breaks it).
+- Signed data used the packet's raw RDATA, so valid signatures on NS, CNAME, MX, SOA, PTR, SRV, NAPTR, RP and DNAME failed
+  whenever the server compressed names: `DnsResourceRecord.GetCanonicalRData()` rebuilds them uncompressed and lower-cased
+  (`DnsNsRecord` gained `ToWire`). Wildcard-expanded answers are now verified against the wildcard owner (RRSIG Labels).
+- The root name was encoded as two zero bytes (`Get-DnssecCanonicalNameWire`), breaking every digest/signature over the root.
+- Trust anchors were one per zone, so the root's second KSK overwrote the first. A zone now holds a list. The shipped
+  `Helpers\trust-anchors.json` was refreshed from IANA (now KSK 20326 and 38696; the root DNSKEY RRset is signed only by 38696 since the rollover).
+- `Update-DnssecTrustAnchorFile` threw under StrictMode on the absent `validUntil` attribute and never completed.
+- `DnsBinaryReader.ReadBytes(0)` and zero-length RDATA returned two bytes (descending range); now empty.
+- `Invoke-DnsUdpQuery` now retries over TCP when the UDP answer is truncated (TC), which signed zones such as .org need for DNSKEY.
+
+### Fixed (resolver)
+- NXDOMAIN and NODATA are returned as Final answers (raw results carry `Negative`), not as a "Server-set cycle detected" BailOut;
+  SERVFAIL/REFUSED/FORMERR/NOTIMP make the resolver try the next server.
+- Formatting any signed negative answer threw (NSEC/NSEC3 used non-existent property names `NextName`/`TypeBitMaps`).
+- UDP socket now matches the server's address family (IPv6 roots/glue always failed before).
+- UDP replies must match the query ID, QR bit and question; others are discarded until the deadline. Query IDs now come from the OS
+  cryptographic RNG.
+- Glue is accepted only for nameservers the referral names; `Resolve-NameserverAddress` accepts addresses only for the asked name or its CNAME chain.
+- CNAME following is capped at 8; nameserver-name resolution shares its visited set down the recursion and is capped at depth 6.
+- `Test-DnssecValidation` builds its zone path from real zone apexes (a name with its own SOA), so host names validate; a missing DS is UNSIGNED.
+- DoT validates the server certificate (the callback that accepted everything is gone), has connect/read/write timeouts, no longer spins when
+  the peer closes the connection, checks the response ID and disposes its sockets. DoH sets a timeout and an Accept header, checks the ID, disposes.
+
+### Added / fixed (denial of existence, algorithms, DualStack)
+- **Insecure delegations are now proven, not assumed.** A missing DS is accepted as "unsigned delegation" only when the parent's signed NSEC or
+  NSEC3 (matching record, or an opt-out proof) shows it (`Test-DnssecDsAbsence`); an unproven missing DS stays `Indeterminate`, since it could be
+  a stripped DS. New trust status `Insecure`. An answer with no RRSIG is judged by walking the zone cuts (`Get-DnssecInsecureProof`): provably in an
+  unsigned zone -> `Unsigned`/`Insecure`; zone is signed -> `Bogus` (signature stripped). Verified live: microsoft.com and amazon.com are
+  "provably unsigned" via the .com NSEC3 opt-out proof.
+- `Find-DnssecNsec3NextCloser` hashed the query name; it now hashes the name one label below the closest encloser (RFC 5155), and compares
+  ordinally. The NSEC3 helpers accept an empty salt.
+- NSEC3 `Salt`, RRSIG `Signature`, zero-length `RawRData`, IPSECKEY and OPENPGPKEY keys were `$null` when empty (an `$x = if (...) {...} else {[byte[]]@()}`
+  result is unrolled); now empty arrays.
+- Signature algorithms 5 and 7 (RSA/SHA-1), 10 (RSA/SHA-512) and 14 (ECDSA P-384) are verified in addition to 8 and 13; RSA key lengths are validated;
+  crypto objects are disposed. Ed25519/Ed448 (15, 16) remain unsupported (not in .NET) and throw, which callers count as a failed verification.
+- DualStack now merges when the two response codes agree (it required the same random server). The merged `DnssecStatus` is the worse of the two.
+
+### Known, not yet fixed
+- An NXDOMAIN proof is not validated (only the missing-DS denial is); Ed25519/Ed448 are not supported.
+
 ## v0.7
 
 ### Breaking changes

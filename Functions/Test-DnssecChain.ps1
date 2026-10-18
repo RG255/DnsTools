@@ -58,7 +58,8 @@
 		}
 
 		$ok = Test-DnssecRrsig -Rrsig $sig -Rrset $DnskeyRrset -DnskeyRrset $DnskeyRrset
-		if (-not $ok)
+		# Test-DnssecRrsig returns an object (Valid/Reason) - always truthy - so test its .Valid.
+		if (-not $ok.Valid)
 		{
 			return [pscustomobject]@{
 				Valid  = $false

@@ -21,6 +21,11 @@
 
 	foreach ($label in $labels)
 	{
+		# The root ('' or '.') splits to a single empty label; it is encoded by the terminating 0 alone.
+		# Without this skip the root became 00 00, which broke every digest/signature over the root zone.
+		if ($label.Length -eq 0)
+		{continue}
+
 		$labelBytes = [System.Text.Encoding]::ASCII.GetBytes($label)
 
 		# Explicit cast ensures Add() receives a byte

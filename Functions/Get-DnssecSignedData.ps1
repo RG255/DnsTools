@@ -59,7 +59,18 @@
 	# Canonical RRset
 	$sorted = Get-DnssecCanonicalRrsetData -Rrset $Rrset
 
-	$nameWire = [byte[]](Get-DnssecCanonicalNameWire -name $Rrset[0].Name)
+	# Wildcard expansion (RFC 4035 5.3.2): when the owner has more labels than the RRSIG Labels field, the
+	# signature was made over the wildcard owner "*.<last Labels labels>", not the expanded name.
+	$ownerName = $Rrset[0].Name
+	$ownerLabels = @($ownerName.TrimEnd('.').Split('.') | Where-Object -FilterScript {$_ -ne ''})
+	if ($ownerLabels.Count -gt $Rrsig.Labels)
+	{
+		$ownerName = if ($Rrsig.Labels -eq 0)
+		{'*'}
+		else
+		{'*.' + (($ownerLabels[($ownerLabels.Count - $Rrsig.Labels)..($ownerLabels.Count - 1)]) -join '.')}
+	}
+	$nameWire = [byte[]](Get-DnssecCanonicalNameWire -name $ownerName)
 	$type  = [uint16]$Rrset[0].Type
 	$class = [uint16]$Rrset[0].Class
 

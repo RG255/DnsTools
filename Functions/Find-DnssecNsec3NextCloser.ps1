@@ -37,7 +37,7 @@
 		[int]$Iterations,
 
 		[Parameter(Mandatory)]
-		[byte[]]$salt
+		[AllowEmptyCollection()][byte[]]$salt
 	)
 
 	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
@@ -47,8 +47,15 @@
 	if (-not $records)
 	{return $null}
 
-	# Compute next-closer name (the query itself)
-	$nextCloser = $QueryName.ToLower().TrimEnd('.')
+	# Next closer name (RFC 5155 section 1.3): the name one label longer than the closest encloser, on the path to
+	# the query name. 0.8: this used to be the query name itself, which is only right when the closest encloser is
+	# the query's immediate parent; for a query several labels below the encloser it hashed the wrong name and
+	# rejected valid proofs.
+	$queryLabels = $QueryName.ToLower().TrimEnd('.').Split('.')
+	$ceLabelCount = @($ClosestEncloserName.ToLower().TrimEnd('.').Split('.') | Where-Object -FilterScript { $_ -ne '' }).Count
+	if ($queryLabels.Count -le $ceLabelCount)
+	{return $null}
+	$nextCloser = ($queryLabels[($queryLabels.Count - $ceLabelCount - 1)..($queryLabels.Count - 1)] -join '.')
 	$canon = $nextCloser + '.'
 
 	# Compute its hash
@@ -74,18 +81,18 @@
 		$cmpB = [System.BitConverter]::ToString($bBytes)
 		$cmpH = [System.BitConverter]::ToString($ncHash)
 
-		$aLessB = ($cmpA -lt $cmpB)
+		$aLessB = ([string]::CompareOrdinal($cmpA, $cmpB) -lt 0)
 
 		if ($aLessB)
 		{
 			# Normal interval
-			if ($cmpA -lt $cmpH -and $cmpH -lt $cmpB)
+			if ([string]::CompareOrdinal($cmpA, $cmpH) -lt 0 -and [string]::CompareOrdinal($cmpH, $cmpB) -lt 0)
 			{return $rec}
 		}
 		else
 		{
 			# Wrap-around interval
-			if ($cmpH -gt $cmpA -or $cmpH -lt $cmpB)
+			if ([string]::CompareOrdinal($cmpH, $cmpA) -gt 0 -or [string]::CompareOrdinal($cmpH, $cmpB) -lt 0)
 			{return $rec}
 		}
 	}

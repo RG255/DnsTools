@@ -32,7 +32,7 @@
 		}
 
 		$remaining = $len - ($r.Position - $startPos)
-		$key = if ($remaining -gt 0) {$r.ReadBytes($remaining)} else {[byte[]]@()}
+		[byte[]]$key = $r.ReadBytes([Math]::Max(0, $remaining))
 
 		return [DnsIpsecKeyRecord]::new($prec, $gwType, $alg, $gw, $key)
 	}

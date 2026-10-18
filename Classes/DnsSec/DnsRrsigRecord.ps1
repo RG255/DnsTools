@@ -50,10 +50,8 @@
 		if ($remaining -lt 0)
 		{throw "RRSIG parse overran RDLENGTH: consumed $bytesConsumed of $len"}
 
-		$sig = if ($remaining -gt 0)
-		{$r.ReadBytes($remaining)}
-		else
-		{[byte[]]@()}
+		# Typed statement-form assignment: an if-expression result is unrolled and an empty array becomes $null.
+		[byte[]]$sig = $r.ReadBytes($remaining)
 
 		return [DnsRrsigRecord]::new(
 			$typeC,$alg,$lbls,$orig,$exp,$inc,$tag,$signer,$sig

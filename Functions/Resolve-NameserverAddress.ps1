@@ -31,16 +31,35 @@
 		[string[]]$BootstrapServers,
 
 		[switch]$UseGlueOnly,
-		[switch]$Trace
+		[switch]$Trace,
+
+		# Internal, set on the recursive call. The visited set is SHARED down the whole recursion (it used to be
+		# created fresh in every call, so two zones whose nameservers sit in each other's zones with no glue
+		# recursed without limit), and Depth caps what the set cannot catch.
+		[Parameter(DontShow)]
+		[AllowNull()]
+		[System.Collections.Generic.HashSet[string]]$VisitedNames = $null,
+
+		[Parameter(DontShow)]
+		[int]$Depth = 0
 	)
 
 	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
+
+	if ($Depth -gt 6)
+	{
+		Write-Verbose -Message "Resolve-NameserverAddress: recursion depth limit reached resolving $nsName"
+		return $null
+	}
 
 	$target = $nsName.TrimEnd('.').ToLower()
 	$currentServers = $BootstrapServers | Sort-Object -Unique
 
 	$visitedServerSets = New-Object System.Collections.Generic.HashSet[string]
-	$visitedNsNames    = New-Object System.Collections.Generic.HashSet[string]
+	$visitedNsNames    = $VisitedNames
+	if ($null -eq $visitedNsNames)
+	{$visitedNsNames = New-Object System.Collections.Generic.HashSet[string]}
+	$null = $visitedNsNames.Add($target)
 
 	$maxIterations = 40
 	$iteration = 0
@@ -69,9 +88,22 @@
 
 					Write-Verbose -Message "Received response: Q=$($resp.Questions[0].Name) AUTH=$($resp.Authority.Count)"
 
+					# 0.8: accept an address only for the name asked about or a name reached from it through CNAMEs in
+					# this same answer; an A/AAAA for any other owner is ignored (it was accepted for any owner).
+					$allowedOwners = New-Object System.Collections.Generic.HashSet[string]
+					$null = $allowedOwners.Add($target)
+					foreach ($pass in 1..4)
+					{
+						foreach ($cn in @($resp.Answers | Where-Object { $_.Type -eq 5 -and $_.RDataObject }))
+						{
+							if ($allowedOwners.Contains($cn.Name.TrimEnd('.').ToLower()))
+							{$null = $allowedOwners.Add($cn.RDataObject.Target.TrimEnd('.').ToLower())}
+						}
+					}
+
 					foreach ($rr in $resp.Answers)
 					{
-						if ($rr.Type -in 1,28 -and $rr.RDataObject -and $rr.RDataObject.Address) {
+						if ($rr.Type -in 1,28 -and $rr.RDataObject -and $rr.RDataObject.Address -and $allowedOwners.Contains($rr.Name.TrimEnd('.').ToLower())) {
 							$null = $answers.Add($rr.RDataObject.Address)
 						}
 					}
@@ -84,8 +116,10 @@
 				# -------------------------
 				# Glue handling
 				# -------------------------
+				# 0.8: glue only for a nameserver the referral names (see Resolve-DnsIterative).
+				$referredNs = @($resp.Authority | Where-Object { $_.Type -eq 2 -and $_.RDataObject } | ForEach-Object { $_.RDataObject.NsName.TrimEnd('.').ToLower() })
 				[string[]]$glueAddrs = @($resp.Additional |
-						Where-Object { $_.Type -in 1,28 } |
+						Where-Object { $_.Type -in 1,28 -and $referredNs -contains $_.Name.TrimEnd('.').ToLower() } |
 						ForEach-Object {
 							if ($_.RDataObject -and $_.RDataObject.Address) {
 								$_.RDataObject.Address
@@ -133,7 +167,7 @@
 
 					Write-Verbose -Message "Recursing to resolve NS name $nsKey"
 
-					$nsAddrs = Resolve-NameserverAddress -nsName $ns -BootstrapServers $BootstrapServers -UseGlueOnly:$UseGlueOnly -Trace:$Trace
+					$nsAddrs = Resolve-NameserverAddress -nsName $ns -BootstrapServers $BootstrapServers -UseGlueOnly:$UseGlueOnly -Trace:$Trace -VisitedNames $visitedNsNames -Depth ($Depth + 1)
 					if ($nsAddrs) {
 						foreach ($a in $nsAddrs) {
 							if (-not [string]::IsNullOrWhiteSpace($a)) {

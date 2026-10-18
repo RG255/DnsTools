@@ -34,7 +34,10 @@
 		$start = $r.Position
 		$objValue = [DnsResourceRecord]::ParseRDataTyped($typeValue, $r, $rdlengthValue, $nameValue)
 		$r.Position = $start + $rdlengthValue
-		$rdataValue = $r.Buffer[$start..($start + $rdlengthValue - 1)]
+		# Zero-length RDATA: Buffer[start..(start-1)] is a descending range and would return two bytes.
+		[byte[]]$rdataValue = [byte[]]@()
+		if ($rdlengthValue -gt 0)
+		{$rdataValue = $r.Buffer[$start..($start + $rdlengthValue - 1)]}
 
 		return [DnsResourceRecord]::new(
 			$nameValue,
@@ -111,15 +114,28 @@
 		$w.WriteBytes($this.RawRData)
 	}
 
+	# RDATA in DNSSEC canonical form (RFC 4034 section 6.2). RawRData is a slice of the received packet, so
+	# for types that embed domain names it may contain compression pointers and mixed-case names, neither
+	# of which is what was signed. Rebuild those from the parsed object (ToWire writes uncompressed,
+	# lower-cased names). Types: NS(2) CNAME(5) SOA(6) PTR(12) MX(15) RP(17) SRV(33) NAPTR(35) DNAME(39).
+	# Everything else (A, AAAA, TXT, DNSKEY, DS, NSEC, RRSIG, ...) is already canonical as received.
+	[byte[]] GetCanonicalRData()
+	{
+		if ($this.Type -in 2, 5, 6, 12, 15, 17, 33, 35, 39 -and $null -ne $this.RDataObject)
+		{return $this.RDataObject.ToWire()}
+		return $this.RawRData
+	}
+
 	[byte[]] ToCanonicalWire()
 	{
+		$rdata = $this.GetCanonicalRData()
 		$w = [DnsBinaryWriter]::new()
 		$w.WriteBytes( [byte[]](Get-DnssecCanonicalNameWire -name $this.Name) )
 		$w.WriteUInt16BE($this.Type)
 		$w.WriteUInt16BE($this.Class)
 		$w.WriteUInt32BE($this.Ttl)
-		$w.WriteUInt16BE([uint16]$this.RawRData.Length)
-		$w.WriteBytes($this.RawRData)
+		$w.WriteUInt16BE([uint16]$rdata.Length)
+		$w.WriteBytes($rdata)
 		return $w.ToArray()
 	}
 }

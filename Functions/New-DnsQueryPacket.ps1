@@ -26,9 +26,19 @@
 
 	If (1 -band ($env:MyFunctionTraceEnabled -as [Int])) { Write-MyFunctionTrace }
 
+	# 0.8: the query ID is the only thing (with the source port) an off-path spoofer has to guess, so it comes from
+	# the OS cryptographic generator, not Get-Random (a seeded System.Random, and its -Maximum is exclusive).
+	$idBytes = New-Object -TypeName byte[] -ArgumentList 2
+	$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+	try
+	{$rng.GetBytes($idBytes)}
+	finally
+	{$rng.Dispose()}
+	$queryId = [uint16](([int]$idBytes[0] -shl 8) -bor [int]$idBytes[1])
+
 	$pkt = [DnsPacket]::new()
 	$pkt.Header = [DnsHeader]::new(
-		(Get-Random -Minimum 0 -Maximum 65535),
+		$queryId,
 		0x0100,
 		1, 0, 0, 0
 	)

@@ -26,6 +26,10 @@
 
 	$json = Get-Content -Raw -Path $Path | ConvertFrom-Json
 
+	# Each zone holds a LIST of anchors (the root publishes several KSK digests, e.g. during a rollover).
+	# A file import replaces what the store held for the zones it names, so reloading does not duplicate.
+	$loaded = @{}
+
 	foreach ($anchor in $json)
 	{
 		# Basic validation
@@ -45,12 +49,18 @@
 		if ($Zone -eq '')
 		{$Zone = '.'}
 
+		if (-not $loaded.ContainsKey($Zone))
+		{$loaded[$Zone] = New-Object -TypeName System.Collections.Generic.List[object]}
+
 		# Insert validated anchor
-		$script:TrustAnchors[$Zone] = @{
-			KeyTag     = [int]$anchor.KeyTag
-			Algorithm  = [int]$anchor.Algorithm
-			DigestType = [int]$anchor.DigestType
-			DigestHex  = $anchor.DigestHex.ToLower()
-		}
+		$loaded[$Zone].Add(@{
+				KeyTag     = [int]$anchor.KeyTag
+				Algorithm  = [int]$anchor.Algorithm
+				DigestType = [int]$anchor.DigestType
+				DigestHex  = $anchor.DigestHex.ToLower()
+			})
 	}
+
+	foreach ($zoneKey in @($loaded.Keys))
+	{$script:TrustAnchors[$zoneKey] = $loaded[$zoneKey].ToArray()}
 }

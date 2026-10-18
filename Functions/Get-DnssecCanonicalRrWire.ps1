@@ -22,7 +22,10 @@
 	$w.WriteUInt16BE([uint16]$rr.Class)
 	$w.WriteUInt32BE([uint32]$rr.TTL)
 
-	$rdata = $rr.RawRData
+	if ($rr -is [DnsResourceRecord])
+	{[byte[]]$rdata = $rr.GetCanonicalRData()}
+	else
+	{[byte[]]$rdata = $rr.RawRData}
 	$w.WriteUInt16BE([uint16]$rdata.Length)
 	$w.WriteBytes($rdata)
 

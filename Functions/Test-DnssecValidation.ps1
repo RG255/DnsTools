@@ -126,7 +126,14 @@
 	$zones = @('.')
 	for ($i = $labels.Count - 1; $i -ge 0; $i--) {
 		$zoneName = ($labels[$i..($labels.Count - 1)] -join '.') + '.'
-		$zones += $zoneName
+		# 0.8: only real zone apexes belong in the path. A host name such as www.example.com is not a zone, and
+		# asking for its DS made every host name fail ("chain of trust is broken") on a correctly signed domain.
+		if (Test-DnsZoneApex -Name $zoneName -RootServers $RootServers) {
+			$zones += $zoneName
+		}
+		else {
+			Add-ReportEntry -Section 'ZONE PATH' -Message "$zoneName is not a zone apex (no SOA of its own) - skipped"
+		}
 	}
 
 	Add-ReportEntry -Section 'ZONE PATH' -Message "DNSSEC validation path: $($zones -join ' -> ')"
@@ -134,14 +141,36 @@
 	# Step 3: Validate each zone in the chain
 	$validatedZones = @{}
 
-	# Root is trusted
-	$validatedZones['.'] = @{
-		Zone     = '.'
-		Status   = 'TRUSTED'
-		Reason   = 'Trust anchor'
-		Verified = $true
+	# DNSKEYs authenticated so far, by zone. A child's DS RRset must be signed by its PARENT's keys, so the
+	# parent has to be in here before the child can be verified.
+	$zoneKeys = @{}
+	$trustCache = @{}
+
+	# Root: 0.8 - the root DNSKEY RRset must actually match a configured trust anchor and be signed by it.
+	# Before 0.8 the root was declared TRUSTED unconditionally (even with no anchors configured).
+	$rootTrust = Get-DnssecTrustedKey -Zone '.' -RootServers $RootServers -Cache $trustCache
+	if ($rootTrust.Status -eq 'Secure') {
+		$zoneKeys['.'] = $rootTrust.Dnskeys
+		$validatedZones['.'] = @{
+			Zone     = '.'
+			Status   = 'TRUSTED'
+			Reason   = 'Root DNSKEY RRset anchored and signed'
+			Verified = $true
+		}
+		Add-ReportEntry -Section 'ZONE VALIDATION' -Level 'SUCCESS' -Message "Root zone (.) is trusted: DNSKEY RRset matches a trust anchor and is validly signed"
 	}
-	Add-ReportEntry -Section 'ZONE VALIDATION' -Level 'SUCCESS' -Message "Root zone (.) is trusted via trust anchor"
+	if ($rootTrust.Status -ne 'Secure') {
+		$rootStatus = 'UNANCHORED'
+		if ($rootTrust.Status -eq 'Bogus') { $rootStatus = 'BOGUS' }
+		$validatedZones['.'] = @{
+			Zone     = '.'
+			Status   = $rootStatus
+			Reason   = $rootTrust.Reason
+			Verified = $false
+		}
+		Add-ReportEntry -Section 'ZONE VALIDATION' -Level 'ERROR' -Message "Root zone (.) could NOT be anchored ($($rootTrust.Status)): $($rootTrust.Reason)"
+		[void]$issues.Add("Root zone not anchored: $($rootTrust.Reason)")
+	}
 
 	# Validate each child zone
 	for ($i = 1; $i -lt $zones.Count; $i++) {
@@ -153,6 +182,19 @@
 
 		try {
 			# Query for DS records in parent zone
+			# 0.8: a child can only be verified through its parent's authenticated keys.
+			if (-not $zoneKeys.ContainsKey($parentZone)) {
+				Add-ReportEntry -Section 'ZONE VALIDATION' -Level 'WARNING' -Message "Parent zone $parentZone is not authenticated - cannot verify $childZone"
+				[void]$issues.Add("Cannot verify $childZone : parent zone $parentZone is not authenticated")
+				$validatedZones[$childZone] = @{
+					Zone     = $childZone
+					Status   = 'UNSIGNED'
+					Reason   = "Parent zone $parentZone not authenticated"
+					Verified = $false
+				}
+				continue
+			}
+
 			Add-ReportEntry -Section 'DS QUERY' -Message "Querying DS records for $childZone from parent zone $parentZone"
 			# -Raw added 2026-09-15: same real bug as Resolve-Dnssec.ps1's identical pattern - without it
 			# this gets the FORMATTED result (Status='Success', no .Reason property), so Status was NEVER
@@ -174,6 +216,36 @@
 
 			$dsRecords = @($dsResult.Response.Answers | Where-Object { $_.Type -eq 43 })
 			Add-ReportEntry -Section 'DS QUERY' -Level 'SUCCESS' -Message "Found $($dsRecords.Count) DS record(s)"
+
+			# 0.8: an authoritative "no DS" (NODATA) is now returned as a Final answer with no DS records. That is an
+			# unsigned delegation (or a stripped DS - not distinguishable without an NSEC proof), never SECURE.
+			if ($dsRecords.Count -eq 0) {
+				Add-ReportEntry -Section 'DS QUERY' -Level 'WARNING' -Message "No DS records published for $childZone in $parentZone - delegation is not secured"
+				[void]$issues.Add("No DS records found for $childZone - zone may not be signed")
+				$validatedZones[$childZone] = @{
+					Zone     = $childZone
+					Status   = 'UNSIGNED'
+					Reason   = 'No DS records found'
+					Verified = $false
+				}
+				continue
+			}
+
+			# 0.8: the DS RRset must be validly signed by the parent zone's authenticated keys; an unsigned or
+			# forged DS proves nothing about the child's keys.
+			$dsSigCheck = Test-DnssecRrsetSignature -Rrset $dsRecords -Rrsigs @($dsResult.Response.Answers | Where-Object { $_.Type -eq 46 }) -KeyRecords $zoneKeys[$parentZone] -ZoneName $parentZone
+			if (-not $dsSigCheck.Valid) {
+				Add-ReportEntry -Section 'DS QUERY' -Level 'ERROR' -Message "DS RRset is not validly signed by parent ${parentZone}: $($dsSigCheck.Reason)"
+				[void]$issues.Add("DS RRset for $childZone not validly signed by $parentZone : $($dsSigCheck.Reason)")
+				$validatedZones[$childZone] = @{
+					Zone     = $childZone
+					Status   = 'BOGUS'
+					Reason   = 'DS RRset not validly signed by parent'
+					Verified = $false
+				}
+				continue
+			}
+			Add-ReportEntry -Section 'DS QUERY' -Level 'SUCCESS' -Message "DS RRset signature verified against $parentZone keys"
 
 			foreach ($ds in $dsRecords) {
 				$dsData = $ds.RDataObject
@@ -211,7 +283,9 @@
 			Add-ReportEntry -Section 'DS-DNSKEY VALIDATION' -Message "Validating DS records match DNSKEY records"
 			$dsValidation = Test-DnssecDsForDnskey -DsRrset $dsRecords -DnskeyRrset $dnskeyRecords -ChildZoneName $childZone
 
+			$dsMatchedKeys = @(Get-DnssecDsMatchedKey -DsRecords $dsRecords -DnskeyRecords $dnskeyRecords -Zone $childZone)
 			$matchedDs = @($dsValidation | Where-Object { $_.Valid })
+			if ($dsMatchedKeys.Count -eq 0) { $matchedDs = @() }
 			if ($matchedDs -and $matchedDs.Count -gt 0) {
 				Add-ReportEntry -Section 'DS-DNSKEY VALIDATION' -Level 'SUCCESS' -Message "$($matchedDs.Count) DS record(s) successfully matched to DNSKEY"
 				foreach ($match in $matchedDs) {
@@ -248,9 +322,14 @@
 					Add-ReportEntry -Section 'RRSIG VALIDATION' -Message "RRSIG: KeyTag=$($rrsigData.KeyTag), Algorithm=$($rrsigData.Algorithm), TypeCovered=$($rrsigData.TypeCovered), SignerName=$($rrsigData.SignerName)"
 
 					# Find matching DNSKEY
-					$signingKey = Get-DnssecSigningKey -Rrsig $rrsigData -DnskeyRrset $dnskeyRecords
+					if ([int]$rrsigData.TypeCovered -ne 48) { continue }
+
+					# 0.8: only a key the DS authenticates may sign the DNSKEY RRset. Looking in the whole
+					# (still unauthenticated) set let a forged set - real KSK plus an attacker's key, signed
+					# by the attacker's key - pass.
+					$signingKey = Get-DnssecSigningKey -Rrsig $rrsigData -DnskeyRrset $dsMatchedKeys
 					if (-not $signingKey) {
-						Add-ReportEntry -Section 'RRSIG VALIDATION' -Level 'WARNING' -Message "No matching DNSKEY found for RRSIG KeyTag=$($rrsigData.KeyTag)"
+						Add-ReportEntry -Section 'RRSIG VALIDATION' -Level 'WARNING' -Message "No DS-authenticated DNSKEY found for RRSIG KeyTag=$($rrsigData.KeyTag)"
 						continue
 					}
 
@@ -284,8 +363,18 @@
 			else {
 				Add-ReportEntry -Section 'RRSIG VALIDATION' -Level 'ERROR' -Message 'No RRSIG records found'
 				[void]$issues.Add("No RRSIG records for $childZone")
+				# 0.8: an unsigned DNSKEY RRset is unauthenticated - it must not be reported SECURE (it
+				# previously fell through to the SECURE assignment below, after logging the error).
+				$validatedZones[$childZone] = @{
+					Zone     = $childZone
+					Status   = 'BOGUS'
+					Reason   = 'DNSKEY RRset has no RRSIG'
+					Verified = $false
+				}
+				continue
 			}
 
+			$zoneKeys[$childZone] = $dnskeyRecords
 			$validatedZones[$childZone] = @{
 				Zone     = $childZone
 				Status   = 'SECURE'
@@ -365,7 +454,7 @@
 	}
 
 	# Final verdict
-	$allSecure = ($bogusZones -eq 0) -and ($validatedZones[$zones[-1]].Verified -eq $true)
+	$allSecure = ($bogusZones -eq 0) -and ($validatedZones['.'].Verified -eq $true) -and ($validatedZones[$zones[-1]].Verified -eq $true)
 	if ($allSecure) {
 		Add-ReportEntry -Section 'VERDICT' -Level 'SUCCESS' -Message "DNSSEC VALIDATION: PASSED - Chain of trust is intact"
 	}

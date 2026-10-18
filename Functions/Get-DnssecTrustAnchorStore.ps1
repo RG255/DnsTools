@@ -14,13 +14,18 @@
 	if (-not $trustAnchorsVar -or -not $trustAnchorsVar.Value)
 	{return @()}
 
-	return $script:TrustAnchors.GetEnumerator() | ForEach-Object -Process {
-		[pscustomobject]@{
-			Zone       = $_.Key
-			KeyTag     = $_.Value.KeyTag
-			Algorithm  = $_.Value.Algorithm
-			DigestType = $_.Value.DigestType
-			DigestHex  = $_.Value.DigestHex
+	# One output object per anchor (a zone can hold several).
+	foreach ($entry in $script:TrustAnchors.GetEnumerator())
+	{
+		foreach ($anchor in @($entry.Value))
+		{
+			[pscustomobject]@{
+				Zone       = $entry.Key
+				KeyTag     = $anchor.KeyTag
+				Algorithm  = $anchor.Algorithm
+				DigestType = $anchor.DigestType
+				DigestHex  = $anchor.DigestHex
+			}
 		}
 	}
 }
