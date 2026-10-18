@@ -59,9 +59,25 @@
   Framework nor the .NET versions PowerShell 7 ships on have the primitive. Checked against RFC 8032 vectors and OpenSSL-made signatures under both hosts.
   Algorithm 14 verified live on fedoraproject.org.
 
+### Fixed (second code review)
+- A negative answer is only accepted as a proof when its SOA zone contains the query name; a delegation NSEC/NSEC3 (NS, no SOA) proves only
+  the absence of DS, and a covering delegation record above the name, or a delegation closest encloser, is rejected. Mixed NSEC3 parameters in one
+  response are Indeterminate. An NSEC3 opt-out span reports `Insecure` (an unsigned delegation may exist), not `Secure`. Stops a signed root/parent
+  NSEC being replayed as an NXDOMAIN or NODATA proof for another name.
+- Wildcard-expanded answers (RRSIG Labels fewer than the owner's labels) need the signed NSEC/NSEC3 proof that the exact name does not exist
+  (`Test-DnssecWildcardProof`, RFC 4035 section 5.3.4); without it the answer is Bogus (Indeterminate if no authority section was supplied).
+- One failing RRSIG no longer marks an RRset Bogus when another RRSIG on it verifies (key and algorithm rollovers publish several).
+- A signature made with an algorithm this module cannot verify, or a DS using only an unsupported algorithm or digest type, now makes the data
+  `Insecure` (RFC 4035 section 5.2, RFC 6840 section 5.2) instead of `Bogus`.
+- `Test-DnssecValidation`: PASSED now also requires the target record to validate.
+- The parent of a zone is its enclosing zone (first ancestor with an SOA), not the name with one label removed.
+- `Update-DnssecTrustAnchorFile`: `-Force` no longer overrides `-WhatIf`; IANA's detached signature (root-anchors.p7s) is verified, with the signing chain
+  required to end at the pinned ICANN Root CA, before the anchors are used (`-SkipSignatureCheck` is the explicit opt-out).
+- The TCP retry after a truncated UDP reply checks the reply ID, QR bit and question like a UDP reply (`Test-DnsReplyMatch`).
+- DoH works on Windows PowerShell 5.1 (it never loaded System.Net.Http there); `-DoT '[ipv6]'` without a port and IPv6-literal DoH URLs are accepted.
 ### Known, not yet fixed
 - Ed448 (algorithm 16) is not supported (no SHAKE256 / curve448 in .NET) and throws "Unsupported DNSSEC algorithm", which counts as a failed
-  verification. NSEC3 opt-out and wildcard-synthesised NODATA denials (other than the DS case) are reported `Indeterminate` rather than proven.
+  verification. NSEC3 opt-out and Wildcard-synthesised NODATA denials (other than the DS case) are reported `Indeterminate` rather than proven.
 
 ## v0.7
 

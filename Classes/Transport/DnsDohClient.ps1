@@ -13,6 +13,8 @@
 		$response = $null
 
 		try {
+			# Windows PowerShell 5.1 does not load System.Net.Http by default (PowerShell 7 does); without this every -DoH query failed there.
+			Add-Type -AssemblyName System.Net.Http
 			$httpClient = New-Object -TypeName System.Net.Http.HttpClient
 			$httpClient.Timeout = [TimeSpan]::FromSeconds($this.TimeoutSeconds)
 			# RFC 8484: some servers insist on an explicit Accept for the wire format.

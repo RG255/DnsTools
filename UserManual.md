@@ -173,8 +173,9 @@ What each status means:
 | `Bogus` | A signature or link in the chain failed, or a signed zone's answer was stripped of its signatures or its denial-of-existence proof. Treat the data as untrustworthy. |
 
 Authenticated denial of existence: for a name or type that does not exist, `Resolve-Dnssec` checks the signed SOA plus the NSEC or NSEC3
-records (including the NSEC3 closest-encloser proof for NXDOMAIN) and reports `Negative` as `NXDOMAIN` or `NODATA`. Wildcard-synthesised and
-NSEC3 opt-out NODATA answers are reported `Indeterminate` rather than guessed.
+records (including the NSEC3 closest-encloser proof for NXDOMAIN) and reports `Negative` as `NXDOMAIN` or `NODATA`. Wildcard-synthesised NODATA answers are reported `Indeterminate` rather than guessed, and an NXDOMAIN proved only by an NSEC3 opt-out span is `Insecure` (an unsigned delegation could exist there).
+
+Wildcard-expanded positive answers are accepted only with the signed proof that the exact name does not exist; unsupported signature algorithms (and delegations whose DS uses only an unsupported algorithm or digest type) are treated as unsigned (`Insecure`), as the RFCs require.
 
 Supported signature algorithms: RSA/SHA-1 (5, 7), RSA/SHA-256 (8), RSA/SHA-512 (10), ECDSA P-256 (13), ECDSA P-384 (14) and Ed25519 (15).
 Ed448 (16) is not supported; a zone signed only with it is reported as not validated.
@@ -350,7 +351,7 @@ Inception: 2026-01-15 00:00:00 UTC
 
 DNSSEC validation requires trust anchors. The module includes the current IANA root trust anchors. A zone can have more than one
 (the root publishes several key-signing keys, and two are listed while the key is being replaced), and any one of them anchors the root
-DNSKEY set. If validation reports that no root DNSKEY matches a trust anchor, refresh the anchors with the command below.
+DNSKEY set. If validation reports that no root DNSKEY matches a trust anchor, refresh the anchors with the command below. The download is checked against IANA's detached signature (root-anchors.p7s) and the signing chain must end at the ICANN Root CA; `-SkipSignatureCheck` disables this and leaves you trusting the HTTPS download alone. `-WhatIf` is honoured, including with `-Force`.
 
 ### Update Trust Anchors
 ```powershell

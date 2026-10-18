@@ -34,20 +34,74 @@
 		[Parameter(DontShow)]
 		[string]$OutputPath,
 
-		[switch]$Force
+		[switch]$Force,
+
+		# Escape hatch for a machine that cannot build the signing certificate's chain (offline CA store, TLS-inspecting proxy).
+		# The anchors are then trusted on the strength of the HTTPS download alone - say so to the user.
+		[switch]$SkipSignatureCheck
 	)
 
 	$ianaUrl = 'https://data.iana.org/root-anchors/root-anchors.xml'
+	$signatureUrl = 'https://data.iana.org/root-anchors/root-anchors.p7s'
 
 	try {
 		Write-Verbose "Fetching trust anchors from $ianaUrl"
 		$response = Invoke-WebRequest -Uri $ianaUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
-		[xml]$xml = $response.Content
+		# The exact bytes IANA sent: the signature covers them, so they are verified before they are parsed.
+		$xmlBytes = $response.RawContentStream.ToArray()
+		[xml]$xml = [System.Text.Encoding]::UTF8.GetString($xmlBytes).TrimStart([char]0xFEFF)
 	}
 	catch {
 		throw "Failed to fetch trust anchors from IANA: $($_.Exception.Message)"
 	}
 
+	# 0.8: verify IANA's detached PKCS#7 signature (root-anchors.p7s) over the XML, including the signing certificate's
+	# chain. A plain HTTPS download is the only thing between an interceptor and the root of trust for every DNSSEC
+	# verdict this module gives.
+	if (-not $SkipSignatureCheck) {
+		try {
+			Add-Type -AssemblyName System.Security
+			$sigResponse = Invoke-WebRequest -Uri $signatureUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+			$sigBytes = $sigResponse.RawContentStream.ToArray()
+			$contentInfo = New-Object -TypeName System.Security.Cryptography.Pkcs.ContentInfo -ArgumentList (, $xmlBytes)
+			$cms = New-Object -TypeName System.Security.Cryptography.Pkcs.SignedCms -ArgumentList $contentInfo, $true
+			$cms.Decode($sigBytes)
+			# The signature itself must verify over the exact bytes downloaded.
+			$cms.CheckSignature($true)
+
+			# The signing certificate (CN=DNSSEC Trust Anchor Verification) is issued by ICANN's own root, which is not in
+			# any operating-system store, so the OS cannot validate it. Build the chain from the certificates embedded in the
+			# signature and require that it ends at the ICANN Root CA whose SHA-256 thumbprint is pinned here (recorded
+			# 2026-10-18 from IANA's published signature; compare it with ICANN's published fingerprint if in doubt).
+			$pinnedIcannRoot = 'AEE89906D7CC60C5E151F3BB923ABF8A1B28DC855D5E2127CB524EAD4AAD603D'
+			$signerCert = $cms.SignerInfos[0].Certificate
+			$x509Chain = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Chain
+			$x509Chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+			$x509Chain.ChainPolicy.VerificationFlags = [System.Security.Cryptography.X509Certificates.X509VerificationFlags]::AllowUnknownCertificateAuthority
+			foreach ($embedded in $cms.Certificates)
+			{[void]$x509Chain.ChainPolicy.ExtraStore.Add($embedded)}
+			[void]$x509Chain.Build($signerCert)
+			if ($x509Chain.ChainElements.Count -lt 2)
+			{throw 'the signing certificate does not chain to a CA certificate'}
+			$rootCert = $x509Chain.ChainElements[$x509Chain.ChainElements.Count - 1].Certificate
+			$sha = [System.Security.Cryptography.SHA256]::Create()
+			try
+			{$rootThumb = [BitConverter]::ToString($sha.ComputeHash($rootCert.RawData)).Replace('-', '')}
+			finally
+			{$sha.Dispose()}
+			if ($rootThumb -ne $pinnedIcannRoot)
+			{throw "the signing chain ends at an unexpected root (SHA-256 $rootThumb), not the pinned ICANN Root CA"}
+			foreach ($chainStatus in $x509Chain.ChainStatus)
+			{
+				if ($chainStatus.Status -band [System.Security.Cryptography.X509Certificates.X509ChainStatusFlags]::NotTimeValid)
+				{throw "a certificate in the signing chain is outside its validity period: $($chainStatus.StatusInformation)"}
+			}
+			Write-Verbose ('IANA signature verified (signer: {0}; root: {1})' -f $signerCert.Subject, $rootCert.Subject)
+		}
+		catch {
+			throw "The IANA signature on root-anchors.xml could not be verified, so the downloaded anchors were NOT used: $($_.Exception.Message) (use -SkipSignatureCheck only if you accept trusting the HTTPS download alone)"
+		}
+	}
 	# Parse the XML to extract trust anchors
 	$anchors = @()
 	foreach ($keyDigest in $xml.TrustAnchor.KeyDigest) {
@@ -89,7 +143,9 @@
 	}
 
 	# Write to file if Force or user confirms
-	if ($Force -or $PSCmdlet.ShouldProcess($OutputPath, "Update trust anchors file")) {
+	# 0.8: -Force only suppresses the confirmation prompt; it used to short-circuit ShouldProcess, so -Force -WhatIf still overwrote the file.
+	if ($Force) { $ConfirmPreference = 'None' }
+	if ($PSCmdlet.ShouldProcess($OutputPath, 'Update trust anchors file')) {
 		$json = $anchors | ConvertTo-Json -Depth 10
 		Set-Content -Path $OutputPath -Value $json -Encoding UTF8
 		Write-Host "Trust anchors written to: $OutputPath" -ForegroundColor Yellow

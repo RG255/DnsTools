@@ -57,6 +57,8 @@
 		$wantSigner = $ZoneName.TrimEnd('.').ToLower()
 		$reasons = New-Object -TypeName System.Collections.Generic.List[string]
 		$considered = 0
+		$verdicts = 0       # attempts that produced a real answer (valid or invalid)
+		$unsupported = 0    # RRSIGs whose algorithm this module cannot verify
 
 		foreach ($sigRr in $Rrsigs)
 		{
@@ -73,6 +75,14 @@
 			if ($sig.SignerName.TrimEnd('.').ToLower() -ne $wantSigner)
 			{
 				$reasons.Add("RRSIG signer '$($sig.SignerName)' is not the expected zone '$ZoneName'")
+				continue
+			}
+
+			# RFC 4035 5.2: an algorithm we do not implement is "cannot verify", reported apart from "verified and wrong".
+			if (-not (Test-DnssecAlgorithmSupported -Algorithm ([int]$sig.Algorithm)))
+			{
+				$unsupported++
+				$reasons.Add("RRSIG algorithm $($sig.Algorithm) is not supported by this module")
 				continue
 			}
 
@@ -94,11 +104,13 @@
 					$check = Test-DnssecRrsig -Rrsig $sig -Rrset $Rrset -DnskeyRrset @($candidate)
 					# Test-DnssecRrsig returns an OBJECT (Valid/Reason); an object is always truthy, so the
 					# .Valid property must be read - testing the object itself accepts every signature.
+					$verdicts++
 					if ($check.Valid)
 					{
 						return [pscustomobject]@{
-							Valid  = $true
-							Reason = "RRSIG key tag $($sig.KeyTag) verified"
+							Valid       = $true
+							Unsupported = $false
+							Reason      = "RRSIG key tag $($sig.KeyTag) verified"
 						}
 					}
 					$reasons.Add("RRSIG key tag $($sig.KeyTag): $($check.Reason)")
@@ -114,22 +126,25 @@
 		if ($considered -eq 0)
 		{
 			return [pscustomobject]@{
-				Valid  = $false
-				Reason = "No RRSIG covers type $rrType at $ownerName"
+				Valid       = $false
+				Unsupported = $false
+				Reason      = "No RRSIG covers type $rrType at $ownerName"
 			}
 		}
 
 		return [pscustomobject]@{
-			Valid  = $false
-			Reason = ($reasons -join '; ')
+			Valid       = $false
+			Unsupported = ($unsupported -gt 0 -and $verdicts -eq 0)
+			Reason      = ($reasons -join '; ')
 		}
 	}
 	catch
 	{
 		Write-MyCatchAudit -Source 'Test-DnssecRrsetSignature: unexpected error' -ErrorRecord $_
 		return [pscustomobject]@{
-			Valid  = $false
-			Reason = "Unexpected error verifying RRset: $($_.Exception.Message)"
+			Valid       = $false
+			Unsupported = $false
+			Reason      = "Unexpected error verifying RRset: $($_.Exception.Message)"
 		}
 	}
 }

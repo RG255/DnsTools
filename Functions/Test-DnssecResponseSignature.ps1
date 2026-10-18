@@ -12,18 +12,26 @@
 		- the RRSIG signer must be the owner name or an ancestor of it;
 		- the signer's DNSKEY set must be authenticated all the way to a configured trust anchor
 		  (Get-DnssecTrustedKey) - a DNSKEY fetched from the same untrusted resolution is NOT enough;
-		- one RRSIG must verify against those keys (Test-DnssecRrsetSignature).
+		- one RRSIG must verify against those keys (Test-DnssecRrsetSignature). Failures of OTHER RRSIGs on an RRset
+		  that has one valid signature do not count against it (rollovers publish several);
+		- a signature made with an algorithm this module cannot verify makes the RRset Insecure, not Bogus
+		  (RFC 4035 section 5.2);
+		- a wildcard-expanded answer (RRSIG Labels fewer than the owner's labels) additionally needs the signed
+		  proof, from -Authority, that the exact name does not exist (RFC 4035 section 5.3.4).
 
 		Status:
 		  Secure         every RRset verified.
+		  Insecure       no failure, but part of the answer is provably unsigned (or signed with an unsupported algorithm).
 		  Bogus          an RRset carried a signature (or a chain link) that positively failed.
 		  Indeterminate  nothing failed outright, but something could not be proven - the chain could not be
-		                 completed, or an RRset has no RRSIG (an insecure delegation and a stripped signature
-		                 cannot be told apart without a proof of non-existence of DS, which is not done here).
+		                 completed, a wildcard proof was not available, or an RRset has no RRSIG in a zone not proven unsigned.
 		  Unsigned       the response contains no RRSIG at all.
 
 		.PARAMETER Answers
 		The answer-section resource records (DnsResourceRecord), RRSIGs included.
+
+		.PARAMETER Authority
+		The authority-section records of the same response, used for the wildcard proof.
 
 		.PARAMETER RootServers
 		Root server addresses used for the DNSKEY/DS lookups.
@@ -38,6 +46,9 @@
 		[Parameter(Mandatory)]
 		[AllowEmptyCollection()]
 		[psobject[]]$Answers,
+
+		[AllowEmptyCollection()]
+		[psobject[]]$Authority = @(),
 
 		[string[]]$RootServers = $script:RootServerAddresses
 	)
@@ -58,7 +69,7 @@
 			$firstOwner = @($Answers | Where-Object -FilterScript { $_.Type -ne 46 } | Select-Object -First 1)
 			if ($firstOwner.Count -gt 0)
 			{
-				# 0.8: is that legitimate? Only if the chain of trust provably stops at an unsigned delegation.
+				# Is that legitimate? Only if the chain of trust provably stops at an unsigned delegation.
 				$proof = Get-DnssecInsecureProof -Name $firstOwner[0].Name -RootServers $RootServers -Cache $cache
 				if ($proof.Status -eq 'Insecure')
 				{$details.Add("Provably unsigned: zone '$($proof.Zone)' has an authenticated insecure delegation ($($proof.Reason))")}
@@ -128,8 +139,17 @@
 				continue
 			}
 
+			# Outcome for THIS RRset only. A failure of one RRSIG must not poison an RRset that another RRSIG verifies
+			# (algorithm / key rollovers publish several signatures).
 			$secure = $false
+			$secureSigner = $null
+			$secureTrust = $null
+			$secureSig = $null
+			$rrBogus = $false
+			$rrIndeterminate = $false
+			$rrInsecure = $false
 			$failure = $null
+
 			foreach ($sigRr in $covering)
 			{
 				$signer = $sigRr.RDataObject.SignerName.TrimEnd('.').ToLower()
@@ -137,7 +157,7 @@
 				if (-not $isAncestor)
 				{
 					$failure = "RRSIG signer '$signer' is not '$owner' or an ancestor of it"
-					$bogus = $true
+					$rrBogus = $true
 					continue
 				}
 
@@ -146,30 +166,73 @@
 				{
 					$failure = "keys for '$signer' are not authenticated ($($trust.Status)): $($trust.Reason)"
 					if ($trust.Status -eq 'Bogus')
-					{$bogus = $true}
-					else
-					{$indeterminate = $true}
+					{$rrBogus = $true}
+					if ($trust.Status -eq 'Insecure')
+					{$rrInsecure = $true}
+					if ($trust.Status -ne 'Bogus' -and $trust.Status -ne 'Insecure')
+					{$rrIndeterminate = $true}
 					continue
 				}
-
-				$chain[$signer] = $trust.Dnskeys
-				if ($null -eq $firstSigner)
-				{$firstSigner = $trust}
 
 				$check = Test-DnssecRrsetSignature -Rrset $members -Rrsigs @($sigRr) -KeyRecords $trust.Dnskeys -ZoneName $signer
 				if ($check.Valid)
 				{
 					$secure = $true
+					$secureSigner = $signer
+					$secureTrust = $trust
+					$secureSig = $sigRr.RDataObject
 					break
 				}
+
 				$failure = "signature by '$signer' failed: $($check.Reason)"
-				$bogus = $true
+				if ($check.Unsupported)
+				{
+					# RFC 4035 5.2: cannot verify with an algorithm we do not implement -> unsigned, not bogus.
+					$rrInsecure = $true
+					$failure = "signature algorithm not supported by this module - treated as unsigned (RFC 4035 5.2): $($check.Reason)"
+				}
+				if (-not $check.Unsupported)
+				{$rrBogus = $true}
 			}
 
 			if ($secure)
-			{$details.Add("RRset $owner $typeName : VALID")}
-			else
-			{$details.Add("RRset $owner $typeName : NOT VALIDATED - $failure")}
+			{
+				$chain[$secureSigner] = $secureTrust.Dnskeys
+				if ($null -eq $firstSigner)
+				{$firstSigner = $secureTrust}
+
+				# A wildcard-synthesised answer is only trustworthy with the signed proof that the exact name does not exist.
+				$ownerLabelCount = @($owner.Split('.') | Where-Object -FilterScript { $_ -ne '' }).Count
+				if ([int]$secureSig.Labels -lt $ownerLabelCount)
+				{
+					if (@($Authority).Count -eq 0)
+					{
+						$details.Add("RRset $owner $typeName : signature VALID, but it is wildcard-expanded and no authority section was supplied to prove the exact name does not exist")
+						$indeterminate = $true
+						continue
+					}
+					$wild = Test-DnssecWildcardProof -Owner $owner -LabelCount ([int]$secureSig.Labels) -Authority @($Authority) -Keys $secureTrust.Dnskeys -Zone $secureSigner
+					if (-not $wild.Proven)
+					{
+						$details.Add("RRset $owner $typeName : NOT VALIDATED - wildcard-expanded answer without a valid proof that the name does not exist ($($wild.Reason))")
+						$bogus = $true
+						continue
+					}
+					$details.Add("RRset $owner $typeName : VALID (wildcard expansion proven: $($wild.Reason))")
+					continue
+				}
+
+				$details.Add("RRset $owner $typeName : VALID")
+				continue
+			}
+
+			$details.Add("RRset $owner $typeName : NOT VALIDATED - $failure")
+			if ($rrBogus)
+			{$bogus = $true}
+			if (-not $rrBogus -and $rrInsecure)
+			{$insecure = $true}
+			if (-not $rrBogus -and -not $rrInsecure -and $rrIndeterminate)
+			{$indeterminate = $true}
 		}
 
 		$status = 'Secure'

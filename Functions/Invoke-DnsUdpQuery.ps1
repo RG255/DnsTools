@@ -49,10 +49,6 @@
 		# 0.8: accept only a reply that answers THIS query: same 16-bit ID, QR set, and the same question (name, type,
 		# class, compared case-insensitively). Anything else is discarded and the wait continues until the deadline,
 		# so a stale or spoofed datagram can neither be parsed as the answer nor end the wait early.
-		$qEnd = 12
-		while ($qEnd -lt $query.Length -and $query[$qEnd] -ne 0)
-		{$qEnd += 1 + $query[$qEnd]}
-		$qEnd += 5   # root label + QTYPE + QCLASS
 		$deadline = [Diagnostics.Stopwatch]::StartNew()
 		$resp = $null
 		while ($null -eq $resp)
@@ -60,15 +56,7 @@
 			if ($deadline.ElapsedMilliseconds -gt $TimeoutMs)
 			{throw "DNS query to ${server}:$port timed out after $TimeoutMs ms (no matching reply)"}
 			$candidate = $udp.Receive([ref]$remote)
-			$isReply = $candidate.Length -ge $qEnd -and $candidate[0] -eq $query[0] -and $candidate[1] -eq $query[1] -and ($candidate[2] -band 0x80) -ne 0
-			for ($i = 12; $isReply -and $i -lt $qEnd; $i++)
-			{
-				$a = $query[$i]
-				$b = $candidate[$i]
-				if ($a -ge 65 -and $a -le 90) { $a += 32 }
-				if ($b -ge 65 -and $b -le 90) { $b += 32 }
-				if ($a -ne $b) { $isReply = $false }
-			}
+			$isReply = Test-DnsReplyMatch -Query $query -Reply $candidate
 			if ($isReply)
 			{$resp = $candidate}
 			if (-not $isReply)
@@ -118,7 +106,11 @@
 				$respLen = ([int]$lenBuf[0] -shl 8) -bor [int]$lenBuf[1]
 				if ($respLen -lt 12)
 				{throw "TCP DNS response from ${server}:$port has an invalid length ($respLen)"}
-				return [byte[]](& $readExact $respLen)
+				$tcpReply = [byte[]](& $readExact $respLen)
+				# 0.8: the TCP answer must answer THIS query too (ID, QR, question), exactly like a UDP reply.
+				if (-not (Test-DnsReplyMatch -Query $query -Reply $tcpReply))
+				{throw "TCP DNS response from ${server}:$port does not match the query (ID/question)"}
+				return $tcpReply
 			}
 			finally
 			{$tcp.Close()}

@@ -80,6 +80,10 @@
 		if ($soa.Count -eq 0)
 		{return & $mk 'Indeterminate' $kind 'No SOA in the authority section'}
 		$zone = $soa[0].Name.TrimEnd('.').ToLower()
+		# 0.8: the SOA comes from the responder, so it proves nothing unless its zone actually contains the query name.
+		# Without this a signed NSEC/SOA from an unrelated zone (the root, a parent) could be replayed as the proof.
+		if ($zone -ne '' -and $qname -ne $zone -and -not $qname.EndsWith('.' + $zone))
+		{return & $mk 'Bogus' $kind "The SOA zone '$zone' does not contain the query name '$qname' - the denial is for a different zone"}
 
 		$trust = Get-DnssecTrustedKey -Zone $zone -RootServers $RootServers -Cache $Cache
 		if ($trust.Status -ne 'Secure')
@@ -128,6 +132,10 @@
 				$match = @($nsec | Where-Object -FilterScript { $_.Name.TrimEnd('.').ToLower() -eq $qname })
 				if ($match.Count -eq 0)
 				{return & $mk 'Indeterminate' $kind 'No NSEC matches the query name (a wildcard or empty-non-terminal NODATA is not handled)'}
+				# A delegation NSEC (NS set, no SOA) belongs to the PARENT and proves only that no DS exists; for any other type the child must answer.
+				$mt = @($match[0].RDataObject.Types)
+				if ($mt -contains 2 -and $mt -notcontains 6 -and $QueryType -ne 43)
+				{return & $mk 'Bogus' $kind "The NSEC at '$qname' is a delegation NSEC (NS, no SOA); it proves nothing about type $QueryType"}
 				if (& $typeBlocks @($match[0].RDataObject.Types))
 				{return & $mk 'Bogus' $kind "The NSEC at '$qname' lists the queried type (or a CNAME): the denial is false"}
 				if (-not (& $sigOk $match[0]))
@@ -139,6 +147,9 @@
 			if ($cover.Count -eq 0)
 			{return & $mk 'Bogus' $kind "No NSEC covers '$qname'"}
 			$owner = $cover[0].Name.TrimEnd('.').ToLower()
+			$ct = @($cover[0].RDataObject.Types)
+			if ($ct -contains 2 -and $ct -notcontains 6 -and $qname.EndsWith('.' + $owner))
+			{return & $mk 'Bogus' $kind "The covering NSEC at '$owner' is a delegation above '$qname': the name lives in another zone and this is not a proof"}
 			$next = $cover[0].RDataObject.NextDomainName.TrimEnd('.').ToLower()
 
 			# Closest encloser: the longest ancestor of the query name that is also an ancestor of the covering record's owner or next name.
@@ -175,6 +186,12 @@
 		$alg = [int]$params.HashAlgorithm
 		$iter = [int]$params.Iterations
 		[byte[]]$salt = @($params.Salt)
+		foreach ($other in $nsec3)
+		{
+			$o = $other.RDataObject
+			if ([int]$o.HashAlgorithm -ne $alg -or [int]$o.Iterations -ne $iter -or [BitConverter]::ToString([byte[]]@($o.Salt)) -ne [BitConverter]::ToString($salt))
+			{return & $mk 'Indeterminate' $kind 'The NSEC3 records in the response use different hash parameters'}
+		}
 		if ($alg -ne 1)
 		{return & $mk 'Indeterminate' $kind "NSEC3 hash algorithm $alg is not supported"}
 		if ($iter -gt 2500)
@@ -202,6 +219,9 @@
 			$match = @(& $matchHash (& $hashHex $qname))
 			if ($match.Count -eq 0)
 			{return & $mk 'Indeterminate' $kind 'No NSEC3 matches the query name (an opt-out or wildcard NODATA is not handled)'}
+			$mt3 = @($match[0].RDataObject.Types)
+			if ($mt3 -contains 2 -and $mt3 -notcontains 6 -and $QueryType -ne 43)
+			{return & $mk 'Bogus' $kind "The NSEC3 for '$qname' is a delegation NSEC3 (NS, no SOA); it proves nothing about type $QueryType"}
 			if (& $typeBlocks @($match[0].RDataObject.Types))
 			{return & $mk 'Bogus' $kind "The NSEC3 for '$qname' lists the queried type (or a CNAME): the denial is false"}
 			if (-not (& $sigOk $match[0]))
@@ -240,9 +260,16 @@
 		{return & $mk 'Bogus' $kind "No NSEC3 covers the wildcard '$wildcard' at the closest encloser '$ceName'"}
 
 		$ceRr = @(& $matchHash (& $hashHex $ceName))
+		$cet = @($ceRr[0].RDataObject.Types)
+		if ($cet -contains 2 -and $cet -notcontains 6 -and $ceName -ne $zone)
+		{return & $mk 'Bogus' $kind "The closest encloser '$ceName' is a delegation point (NS, no SOA): it cannot be a closest encloser (RFC 5155 section 8.3)"}
 		if (-not (& $sigOk $ceRr[0]) -or -not (& $sigOk $ncCover[0]) -or -not (& $sigOk $wCover[0]))
 		{return & $mk 'Bogus' $kind "An NSEC3 used in the NXDOMAIN proof is not validly signed by '$zone'"}
 
+		# An opt-out span only proves that no SIGNED delegation exists there: the name may exist as an unsigned delegation, so
+		# the NXDOMAIN is not authenticated (RFC 5155 section 9.2).
+		if (([int]$ncCover[0].RDataObject.Flags -band 1) -ne 0)
+		{return & $mk 'Insecure' $kind "The NSEC3 covering '$nextCloser' is an opt-out span: an unsigned delegation may exist, so NXDOMAIN is not authenticated"}
 		return & $mk 'Secure' $kind "Signed NSEC3 closest-encloser proof for '$qname' (encloser '$ceName')"
 	}
 	catch

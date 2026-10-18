@@ -157,9 +157,18 @@ function Get-DnssecChildTrust
 	try
 	{
 		$labels = $Bare.Split('.')
+		# The parent is the ENCLOSING ZONE, found by walking up to the first name that owns an SOA - not simply the name with one label
+		# removed (that is wrong where an intermediate label is not a zone cut, and its DS lookup would return NODATA).
 		$parent = '.'
-		if ($labels.Count -gt 1)
-		{$parent = ($labels[1..($labels.Count - 1)] -join '.') + '.'}
+		for ($i = 1; $i -lt $labels.Count; $i++)
+		{
+			$enclosing = ($labels[$i..($labels.Count - 1)] -join '.')
+			if (Test-DnsZoneApex -Name $enclosing -RootServers $RootServers)
+			{
+				$parent = $enclosing + '.'
+				break
+			}
+		}
 
 		$parentTrust = Get-DnssecTrustedKey -Zone $parent -RootServers $RootServers -Cache $Cache
 		if ($parentTrust.Status -ne 'Secure')
@@ -184,6 +193,15 @@ function Get-DnssecChildTrust
 		$dsSigCheck = Test-DnssecRrsetSignature -Rrset $dsRecords -Rrsigs $dsSigs -KeyRecords $parentTrust.Dnskeys -ZoneName $parent
 		if (-not $dsSigCheck.Valid)
 		{return New-DnssecTrustResult 'Bogus' "DS RRset for '$CacheKey' is not validly signed by parent '$parent': $($dsSigCheck.Reason)" @() $dsRecords}
+
+		# RFC 4035 5.2 / RFC 6840 5.2: if every DS uses an algorithm or digest type we cannot handle, the delegation is treated as
+		# unsigned (Insecure), not bogus - we simply cannot say anything more.
+		$usableDs = @($dsRecords | Where-Object -FilterScript {
+				$d = $_.RDataObject
+				$d -is [DnsDsRecord] -and $d.DigestType -ne 0 -and (Test-DnssecAlgorithmSupported -Algorithm ([int]$d.Algorithm)) -and (Test-DnssecAlgorithmSupported -DigestType ([int]$d.DigestType))
+			})
+		if ($usableDs.Count -eq 0)
+		{return New-DnssecTrustResult 'Insecure' "All DS records for '$CacheKey' use an unsupported algorithm or digest type; treated as an unsigned delegation (RFC 4035 section 5.2)" @() $dsRecords}
 
 		$keyResult = Resolve-DnsIterative -Name $Bare -Type 48 -RootServers $RootServers -Raw
 		if ($keyResult.Status -ne 'Final')

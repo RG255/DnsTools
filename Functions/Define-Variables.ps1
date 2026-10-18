@@ -383,6 +383,21 @@ $script:FunctionExportTable = @{
 	'Test-DnssecChain' = $false
 	# Validates full DNSSEC chain of trust.
 
+	'Test-DnssecAlgorithmSupported' = $false
+	# 0.8: supported signature algorithms / DS digest types (internal).
+
+	'Test-DnssecNsecSpan' = $false
+	# 0.8: NSEC span covers a name (internal).
+
+	'Test-DnssecNsec3Span' = $false
+	# 0.8: NSEC3 span covers a hash (internal).
+
+	'Test-DnssecWildcardProof' = $false
+	# 0.8: signed proof that a wildcard-expanded name does not exist (internal).
+
+	'Test-DnsReplyMatch' = $false
+	# 0.8: reply answers this query: ID, QR, question (internal).
+
 	'Test-DnssecDsAbsence' = $false
 	# 0.8: proves a delegation has no DS from signed NSEC/NSEC3 (internal).
 

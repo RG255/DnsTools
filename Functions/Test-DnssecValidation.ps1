@@ -39,6 +39,7 @@
 	$report = [System.Collections.ArrayList]::new()
 	$issues = [System.Collections.ArrayList]::new()
 	$startTime = Get-Date
+	$targetValid = $false   # set from the target-record validation; PASSED needs it too
 
 	# Helper function to add report entries
 	function Add-ReportEntry {
@@ -403,6 +404,7 @@
 	try {
 		$targetResult = Resolve-Dnssec -name $Name -type $TypeCode -RootServers $RootServers
 
+		$targetValid = [bool]$targetResult.Valid
 		if ($targetResult.Valid) {
 			Add-ReportEntry -Section 'TARGET VALIDATION' -Level 'SUCCESS' -Message "Target record validation: SECURE"
 			Add-ReportEntry -Section 'TARGET VALIDATION' -Message "Reason: $($targetResult.Reason)"
@@ -454,7 +456,7 @@
 	}
 
 	# Final verdict
-	$allSecure = ($bogusZones -eq 0) -and ($validatedZones['.'].Verified -eq $true) -and ($validatedZones[$zones[-1]].Verified -eq $true)
+	$allSecure = $targetValid -and ($bogusZones -eq 0) -and ($validatedZones['.'].Verified -eq $true) -and ($validatedZones[$zones[-1]].Verified -eq $true)
 	if ($allSecure) {
 		Add-ReportEntry -Section 'VERDICT' -Level 'SUCCESS' -Message "DNSSEC VALIDATION: PASSED - Chain of trust is intact"
 	}

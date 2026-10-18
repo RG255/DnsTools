@@ -179,7 +179,7 @@
 		}
 	}
 
-	if ($DoH -and $DoH -notmatch '^https://[a-zA-Z0-9.\-]+(:\d+)?(/[^\s]*)?$') {
+	if ($DoH -and $DoH -notmatch '^https://(\[[0-9a-fA-F:]+\]|[a-zA-Z0-9.\-]+)(:\d+)?(/[^\s]*)?$') {
 		return [PSCustomObject]@{
 			QueryName = $Name
 			QueryType = $null
@@ -423,7 +423,7 @@
 				}
 			}
 			if ($null -eq $check) {
-				$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -RootServers $RootServers
+				$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -Authority @($Response.Authority) -RootServers $RootServers
 			}
 
 			if ($check.Status -in 'Unsigned', 'Insecure', 'Indeterminate') {
@@ -479,6 +479,10 @@
 			} else {
 				# Parse DoT server:port
 				$dotHost = $DoT
+				# [addr] with no port: strip the brackets (they were only stripped when a port followed, so the connect used the literal '[addr]').
+				if ($DoT -match '^\[([^\]]+)\]$') {
+					$dotHost = $Matches[1]
+				}
 				$dotPort = 853
 				if ($DoT -match '^\[([^\]]+)\]:(\d+)$') {
 					$dotHost = $Matches[1]
