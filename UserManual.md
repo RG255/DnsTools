@@ -9,7 +9,7 @@ DnsTools is a PowerShell module for performing iterative DNS resolution and DNSS
 The module lives in a folder named after its version, inside a module folder on your
 `$env:PSModulePath` (see the README for install commands), for example:
 ```
-C:\Program Files\PowerShell\Modules\DnsTools\0.7\
+C:\Program Files\PowerShell\Modules\DnsTools\0.8\
 ```
 
 To load the module:
@@ -137,14 +137,47 @@ Resolve-DnsIterative -Name cloudflare.com -DualStack
 ```
 
 ### DNSSEC Validation
+
+Validation is anchored: a signature only counts if the key that made it can be traced, link by link, back to the
+IANA root trust anchor (root DNSKEY -> DS in the parent -> zone DNSKEY -> RRSIG over the data). A DNSKEY fetched
+from the same untrusted answer is never trusted on its own.
+
 ```powershell
-# Validate DNSSEC signatures
+# Validate the answer as part of a normal lookup
 Resolve-DnsIterative -Name cloudflare.com -Type A -ValidateDnssec
 
 # Check DNSSEC status
 $result = Resolve-DnsIterative -Name cloudflare.com -Type A -ValidateDnssec
-$result.DnssecStatus  # Secure, Unsigned, Bogus, or Indeterminate
+$result.DnssecStatus   # Secure, Insecure, Unsigned, Indeterminate or Bogus
+$result.DnssecDetails  # one line per RRset: what was checked and why it passed or failed
+
+# Resolve and validate in one step; Valid is $true only for a fully authenticated answer
+Resolve-Dnssec -Name cloudflare.com -Type A
+Resolve-Dnssec -Name nothere.example.com -Type A   # a signed NXDOMAIN / NODATA is authenticated too
+
+# Same, plus the authenticated DNSKEYs of every signing zone (Chain)
+Resolve-DnssecChain -Name cloudflare.com -Type A
+
+# A step-by-step report of the whole chain, root downwards
+Test-DnssecValidation -Name www.cloudflare.com
 ```
+
+What each status means:
+
+| Status | Meaning |
+|--------|---------|
+| `Secure` | Every RRset in the answer has a valid signature from a key authenticated to the root trust anchor. |
+| `Insecure` | Part of the answer is provably unsigned: the parent proves, with signed NSEC/NSEC3 records, that the delegation has no DS. This is normal for unsigned domains, not an attack signal. |
+| `Unsigned` | The answer carries no signatures at all. `DnssecDetails` says whether the zone is provably unsigned or whether that could not be established. |
+| `Indeterminate` | Nothing failed outright, but it could not be proven (a lookup in the chain failed, no trust anchor is configured, or a "no DS" answer was not backed by a signed proof). |
+| `Bogus` | A signature or link in the chain failed, or a signed zone's answer was stripped of its signatures or its denial-of-existence proof. Treat the data as untrustworthy. |
+
+Authenticated denial of existence: for a name or type that does not exist, `Resolve-Dnssec` checks the signed SOA plus the NSEC or NSEC3
+records (including the NSEC3 closest-encloser proof for NXDOMAIN) and reports `Negative` as `NXDOMAIN` or `NODATA`. Wildcard-synthesised and
+NSEC3 opt-out NODATA answers are reported `Indeterminate` rather than guessed.
+
+Supported signature algorithms: RSA/SHA-1 (5, 7), RSA/SHA-256 (8), RSA/SHA-512 (10), ECDSA P-256 (13), ECDSA P-384 (14) and Ed25519 (15).
+Ed448 (16) is not supported; a zone signed only with it is reported as not validated.
 
 ### CNAME Chain Resolution
 The resolver automatically follows CNAME chains:
@@ -218,7 +251,7 @@ Resolve-DnsIterative -Name example.com -Type A -DoT "dns.google" -Trace
 |----------|-------------|
 | `QueryName` | The domain that was queried |
 | `QueryType` | Record type with code, e.g., "A(1)", "AAAA(28)" |
-| `Status` | Success, BailOut, or Partial |
+| `Status` | Success, BailOut, Partial, or InvalidArgument |
 | `Server` | The authoritative server that provided the answer |
 | `Flags` | DNS header flags, e.g., "0x8500 (QR, AA, RD)" |
 | `OpCode` | Query operation type (usually QUERY) |
@@ -245,7 +278,7 @@ When using `-ValidateDnssec`:
 
 | Property | Description |
 |----------|-------------|
-| `DnssecStatus` | Secure, Unsigned, Bogus, or Indeterminate |
+| `DnssecStatus` | Secure, Insecure, Unsigned, Indeterminate, or Bogus |
 | `DnssecDetails` | Array of validation steps performed |
 | `DnskeyRecords` | DNSKEY records with decoded flags |
 | `DsRecords` | DS records with algorithm/digest info |
@@ -297,9 +330,10 @@ Inception: 2026-01-15 00:00:00 UTC
 
 | Status | Meaning |
 |--------|---------|
-| `Success` | Query resolved successfully |
-| `BailOut` | Resolution failed (cycle, timeout, no answer) |
-| `Partial` | DualStack: one query succeeded, one failed |
+| `Success` | The query got an answer. This includes a definitive negative answer: NXDOMAIN or NODATA comes back as `Success` with `AnswerCount` 0 and the response code in `RCode` |
+| `BailOut` | Resolution failed (no server answered, a CNAME or nameserver loop was cut off, or the servers returned errors) |
+| `Partial` | DualStack: one query succeeded, one failed, or the two response codes differ |
+| `InvalidArgument` | A usage mistake, such as an invalid name, an invalid `-DoT`/`-DoH` value, or no `-Type` |
 
 ## Response Codes (RCode)
 
@@ -314,7 +348,9 @@ Inception: 2026-01-15 00:00:00 UTC
 
 ## Trust Anchor Management
 
-DNSSEC validation requires trust anchors. The module includes the current IANA root trust anchor.
+DNSSEC validation requires trust anchors. The module includes the current IANA root trust anchors. A zone can have more than one
+(the root publishes several key-signing keys, and two are listed while the key is being replaced), and any one of them anchors the root
+DNSKEY set. If validation reports that no root DNSKEY matches a trust anchor, refresh the anchors with the command below.
 
 ### Update Trust Anchors
 ```powershell
@@ -328,10 +364,16 @@ Update-DnssecTrustAnchorFile -Force
 ## Troubleshooting
 
 ### BailOut: Server-set cycle detected
-This occurs when the resolver visits the same set of nameservers twice, indicating:
-- The requested record type doesn't exist for this domain
-- DNS delegation is broken
+This occurs when the resolver visits the same set of nameservers twice without getting an answer, indicating:
+- DNS delegation is broken (for example a lame delegation)
+- Every server in the set returned an error or timed out
 - Network issues preventing resolution
+
+A name or record type that simply does not exist is NOT a failure: it is returned as `Success` with no answers and `RCode`
+NXDOMAIN(3) or NOERROR(0) (NODATA).
+
+### BailOut: CNAME chain longer than 8
+A CNAME loop (a -> b -> a) or an unusually long chain. The resolver stops at 8 links.
 
 ### Invalid DNS name syntax
 The `-Name` parameter validates DNS name syntax. Ensure:
@@ -347,9 +389,20 @@ The `-IPAddr` parameter validates IP address format:
 ### DNSSEC Status: Bogus
 Indicates DNSSEC validation failed:
 - Invalid signature
-- Missing DNSKEY
+- No DNSKEY that the parent's DS record authenticates
 - Expired signatures
 - Chain of trust broken
+- A zone that is signed returned an answer without signatures or without its denial-of-existence proof
+
+Read `DnssecDetails` (or the `Reason` of `Resolve-Dnssec`) for the RRset and the step that failed.
+
+### DNSSEC Status: Indeterminate
+The chain could not be completed. Common causes: no trust anchor is configured (run `Update-DnssecTrustAnchorFile`), a nameserver
+did not answer for a DNSKEY or DS lookup, or a delegation has no DS record but the parent did not return a signed proof of that.
+
+### DNSSEC Status: Insecure or Unsigned
+Not an error. `Insecure` means the domain (or part of the answer) is provably in an unsigned zone; `Unsigned` means the answer had no
+signatures. Check `DnssecDetails` to see whether the zone is provably unsigned or whether that could not be established.
 
 ### No EDNS in output
 Not all servers respond with EDNS/OPT records. EDNS info appears only when the server includes it.
@@ -357,7 +410,8 @@ Not all servers respond with EDNS/OPT records. EDNS info appears only when the s
 ### DoT/DoH Transport Errors
 If using `-DoT` or `-DoH` fails with "Transport error":
 - **Connection refused**: The server may not support DoT/DoH or the port is blocked
-- **SSL/TLS error**: Certificate validation issues (DoT)
+- **SSL/TLS error**: Certificate validation issues (DoT). The server's certificate must chain to a trusted root and match the name
+  or IP address you gave; there is no option to skip the check. Connect, read and write time out after 5 seconds
 - **HTTP error**: Invalid endpoint URL or server error (DoH)
 - Verify the server address/URL is correct
 - Ensure network connectivity to the DoT port (853) or HTTPS port (443)
@@ -379,7 +433,13 @@ The `-DoH` parameter requires an HTTPS URL:
 
 ## Version History
 
-- **0.4**: Current version with iterative resolution, DNSSEC validation, DualStack support, CNAME chain following, PTR support with -IPAddr parameter, DNS-over-TLS (DoT) and DNS-over-HTTPS (DoH) encrypted transport options
+- **0.8**: DNSSEC validation rebuilt on a real chain of trust (keys authenticated from the root trust anchor; an invalid signature is now
+  actually rejected); authenticated NXDOMAIN/NODATA and insecure-delegation proofs (NSEC and NSEC3); algorithms 5, 7, 10, 14 and 15 added;
+  several trust anchors per zone; NXDOMAIN/NODATA returned as answers; CNAME and nameserver loop limits; glue accepted only for named
+  nameservers; UDP replies matched to the query, cryptographic query IDs and TCP retry on truncation; IPv6 servers work; DoT certificate
+  validation, timeouts and EOF handling; DoH timeout; DualStack merges more reliably. See CHANGELOG.md.
+- **0.7**: Cleaned-up function names (see CHANGELOG.md), function tracing, catch-audit log.
+- **0.4**: Iterative resolution, DNSSEC validation, DualStack support, CNAME chain following, PTR support with -IPAddr, DNS-over-TLS (DoT) and DNS-over-HTTPS (DoH).
 
 ## Support
 

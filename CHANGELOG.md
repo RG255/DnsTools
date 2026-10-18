@@ -62,6 +62,7 @@
 ### Known, not yet fixed
 - Ed448 (algorithm 16) is not supported (no SHAKE256 / curve448 in .NET) and throws "Unsupported DNSSEC algorithm", which counts as a failed
   verification. NSEC3 opt-out and wildcard-synthesised NODATA denials (other than the DS case) are reported `Indeterminate` rather than proven.
+
 ## v0.7
 
 ### Breaking changes
