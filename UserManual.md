@@ -351,7 +351,7 @@ Inception: 2026-01-15 00:00:00 UTC
 
 DNSSEC validation requires trust anchors. The module includes the current IANA root trust anchors. A zone can have more than one
 (the root publishes several key-signing keys, and two are listed while the key is being replaced), and any one of them anchors the root
-DNSKEY set. If validation reports that no root DNSKEY matches a trust anchor, refresh the anchors with the command below. The download is checked against IANA's detached signature (root-anchors.p7s) and the signing chain must end at the ICANN Root CA; `-SkipSignatureCheck` disables this and leaves you trusting the HTTPS download alone. `-WhatIf` is honoured, including with `-Force`.
+DNSKEY set. If validation reports that no root DNSKEY matches a trust anchor, refresh the anchors with the command below. The download is checked against IANA's detached signature (root-anchors.p7s) and the signing chain must end at the ICANN Root CA; `-SkipSignatureCheck` disables this and leaves you trusting the HTTPS download alone. `-WhatIf` is honoured, including with `-Force`. The file lives inside the module folder, so updating an installed copy under Program Files needs an elevated session.
 
 ### Update Trust Anchors
 ```powershell

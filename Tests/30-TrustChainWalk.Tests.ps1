@@ -173,5 +173,25 @@ InModuleScope DnsTools {
 			$script:asked | Should -Contain 'a.b.example.com/43'
 			$script:asked | Should -Not -Contain 'b.example.com/43'
 		}
+
+		It "treats a DS RRset signed with an unsupported algorithm as Insecure, not Bogus" {
+			$ksk = $script:kskKey
+			$ds = Get-DsRr $ksk 'example.com'
+			$now = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+			$fake = [DnsResourceRecord]::new('example.com', 46, 1, 300, [byte[]]@(), [DnsRrsigRecord]::new(43, 16, 2, 300, ($now + 3600), ($now - 3600), 777, '', [byte[]](1..114)))
+			$script:dsPacket = Get-AnswerPacket @($ds, $fake)
+			Mock Resolve-DnsIterative { [pscustomobject]@{ Status = 'Final'; Response = $script:dsPacket } }
+			(Get-DnssecTrustedKey -Zone 'example.com' -RootServers '192.0.2.1').Status | Should -Be 'Insecure'
+		}
+
+		It "ignores DNSKEY records that are not owned by the root when anchoring the root" {
+			$rootRr = Get-KeyRr $script:rootKey ''
+			$rootSig = Get-SigRr $script:rootKey $rootRr ''
+			$other = Get-KeyRr (Get-ChainKey) 'evil.test'
+			$script:rootPacket = Get-AnswerPacket @($rootRr, $other, $rootSig)
+			$r = Get-DnssecTrustedKey -Zone '.' -RootServers '192.0.2.1'
+			$r.Status | Should -Be 'Secure'
+			@($r.Dnskeys).Count | Should -Be 1
+		}
 	}
 }

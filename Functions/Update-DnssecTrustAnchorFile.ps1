@@ -69,34 +69,16 @@
 			# The signature itself must verify over the exact bytes downloaded.
 			$cms.CheckSignature($true)
 
-			# The signing certificate (CN=DNSSEC Trust Anchor Verification) is issued by ICANN's own root, which is not in
-			# any operating-system store, so the OS cannot validate it. Build the chain from the certificates embedded in the
-			# signature and require that it ends at the ICANN Root CA whose SHA-256 thumbprint is pinned here (recorded
-			# 2026-10-18 from IANA's published signature; compare it with ICANN's published fingerprint if in doubt).
+			# The signing certificate (CN=DNSSEC Trust Anchor Verification) is issued by ICANN's own root, which is not in any
+			# operating-system store. Its chain (built from the certificates embedded in the signature) must end at the ICANN Root CA
+			# whose SHA-256 thumbprint is pinned here (recorded 2026-10-18 from IANA's published signature; compare it with ICANN's
+			# published fingerprint if in doubt), and must be fully valid - see Test-DnssecAnchorSignerChain.
 			$pinnedIcannRoot = 'AEE89906D7CC60C5E151F3BB923ABF8A1B28DC855D5E2127CB524EAD4AAD603D'
 			$signerCert = $cms.SignerInfos[0].Certificate
-			$x509Chain = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Chain
-			$x509Chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
-			$x509Chain.ChainPolicy.VerificationFlags = [System.Security.Cryptography.X509Certificates.X509VerificationFlags]::AllowUnknownCertificateAuthority
-			foreach ($embedded in $cms.Certificates)
-			{[void]$x509Chain.ChainPolicy.ExtraStore.Add($embedded)}
-			[void]$x509Chain.Build($signerCert)
-			if ($x509Chain.ChainElements.Count -lt 2)
-			{throw 'the signing certificate does not chain to a CA certificate'}
-			$rootCert = $x509Chain.ChainElements[$x509Chain.ChainElements.Count - 1].Certificate
-			$sha = [System.Security.Cryptography.SHA256]::Create()
-			try
-			{$rootThumb = [BitConverter]::ToString($sha.ComputeHash($rootCert.RawData)).Replace('-', '')}
-			finally
-			{$sha.Dispose()}
-			if ($rootThumb -ne $pinnedIcannRoot)
-			{throw "the signing chain ends at an unexpected root (SHA-256 $rootThumb), not the pinned ICANN Root CA"}
-			foreach ($chainStatus in $x509Chain.ChainStatus)
-			{
-				if ($chainStatus.Status -band [System.Security.Cryptography.X509Certificates.X509ChainStatusFlags]::NotTimeValid)
-				{throw "a certificate in the signing chain is outside its validity period: $($chainStatus.StatusInformation)"}
-			}
-			Write-Verbose ('IANA signature verified (signer: {0}; root: {1})' -f $signerCert.Subject, $rootCert.Subject)
+			$chainCheck = Test-DnssecAnchorSignerChain -SignerCertificate $signerCert -ExtraCertificate @($cms.Certificates) -PinnedRootThumbprint $pinnedIcannRoot
+			if (-not $chainCheck.Valid)
+			{throw $chainCheck.Reason}
+			Write-Verbose ('IANA signature verified (signer: {0}; root: {1})' -f $signerCert.Subject, $chainCheck.RootSubject)
 		}
 		catch {
 			throw "The IANA signature on root-anchors.xml could not be verified, so the downloaded anchors were NOT used: $($_.Exception.Message) (use -SkipSignatureCheck only if you accept trusting the HTTPS download alone)"

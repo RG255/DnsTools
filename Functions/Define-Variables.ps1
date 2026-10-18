@@ -398,6 +398,9 @@ $script:FunctionExportTable = @{
 	'Test-DnsReplyMatch' = $false
 	# 0.8: reply answers this query: ID, QR, question (internal).
 
+	'Test-DnssecAnchorSignerChain' = $false
+	# 0.8: the IANA anchor-signing certificate chains to the pinned ICANN root with no chain errors (internal).
+
 	'Test-DnssecDsAbsence' = $false
 	# 0.8: proves a delegation has no DS from signed NSEC/NSEC3 (internal).
 

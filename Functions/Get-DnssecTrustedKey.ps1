@@ -121,13 +121,18 @@ function Get-DnssecRootTrust
 		if ($null -eq $resp)
 		{return New-DnssecTrustResult 'Indeterminate' 'Could not retrieve the root DNSKEY RRset from any root server' @() @()}
 
-		$keys = @($resp.Answers | Where-Object -FilterScript { $_.Type -eq 48 })
+		# Only DNSKEYs owned by the root itself (the child walk filters by owner for the same reason: one RRset, one owner).
+		$keys = @($resp.Answers | Where-Object -FilterScript { $_.Type -eq 48 -and $_.Name.TrimEnd('.') -eq '' })
 		$sigs = @($resp.Answers | Where-Object -FilterScript { $_.Type -eq 46 })
 		$anchored = @($keys | Where-Object -FilterScript { Test-DnssecAnchoredDnskey -Zone '.' -Dnskey $_.RDataObject })
 		if ($anchored.Count -eq 0)
 		{return New-DnssecTrustResult 'Bogus' 'No root DNSKEY matches a configured trust anchor' @() @()}
 
 		$sigCheck = Test-DnssecRrsetSignature -Rrset $keys -Rrsigs $sigs -KeyRecords $anchored -ZoneName ''
+		# A root signature made with an algorithm we cannot verify means we can say nothing about the root (the root cannot be
+		# "unsigned"), so that is Indeterminate rather than Bogus.
+		if (-not $sigCheck.Valid -and $sigCheck.Unsupported)
+		{return New-DnssecTrustResult 'Indeterminate' "The root DNSKEY RRset is signed with an algorithm this module cannot verify: $($sigCheck.Reason)" @() @()}
 		if (-not $sigCheck.Valid)
 		{return New-DnssecTrustResult 'Bogus' "Root DNSKEY RRset is not validly signed by an anchored key: $($sigCheck.Reason)" @() @()}
 
@@ -191,6 +196,9 @@ function Get-DnssecChildTrust
 		}
 
 		$dsSigCheck = Test-DnssecRrsetSignature -Rrset $dsRecords -Rrsigs $dsSigs -KeyRecords $parentTrust.Dnskeys -ZoneName $parent
+		# RFC 4035 5.2: a parent signature we cannot verify makes the delegation unsigned for us (Insecure), not an attack.
+		if (-not $dsSigCheck.Valid -and $dsSigCheck.Unsupported)
+		{return New-DnssecTrustResult 'Insecure' "The DS RRset for '$CacheKey' is signed with an algorithm this module cannot verify; treated as unsigned (RFC 4035 section 5.2): $($dsSigCheck.Reason)" @() $dsRecords}
 		if (-not $dsSigCheck.Valid)
 		{return New-DnssecTrustResult 'Bogus' "DS RRset for '$CacheKey' is not validly signed by parent '$parent': $($dsSigCheck.Reason)" @() $dsRecords}
 
@@ -214,6 +222,8 @@ function Get-DnssecChildTrust
 		{return New-DnssecTrustResult 'Bogus' "No DNSKEY in '$CacheKey' is authenticated by its DS records (secure delegation failure)" @() $dsRecords}
 
 		$keySigCheck = Test-DnssecRrsetSignature -Rrset $keys -Rrsigs $keySigs -KeyRecords $dsMatched -ZoneName $Bare
+		if (-not $keySigCheck.Valid -and $keySigCheck.Unsupported)
+		{return New-DnssecTrustResult 'Insecure' "The DNSKEY RRset for '$CacheKey' is signed with an algorithm this module cannot verify; treated as unsigned (RFC 4035 section 5.2): $($keySigCheck.Reason)" @() $dsRecords}
 		if (-not $keySigCheck.Valid)
 		{return New-DnssecTrustResult 'Bogus' "DNSKEY RRset for '$CacheKey' is not validly signed by a DS-authenticated key: $($keySigCheck.Reason)" @() $dsRecords}
 

@@ -64,10 +64,10 @@
 			{throw "invalid DNS response length $respLen"}
 
 			$resp = $this.ReadExact($ssl, $respLen)
-			$parsed = [DnsPacket]::Parse($resp)
-			if ($parsed.Header.Id -ne $packet.Header.Id)
-			{throw 'response ID does not match the query ID'}
-			return $parsed
+			# Same acceptance rule as the UDP and TCP paths: matching ID, QR set, and the question we asked.
+			if (-not (Test-DnsReplyMatch -Query $queryBytes -Reply $resp))
+			{throw 'response does not match the query (ID / QR / question)'}
+			return [DnsPacket]::Parse($resp)
 		}
 		catch {
 			throw "DoT query failed: $($_.Exception.Message)"

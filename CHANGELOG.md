@@ -75,6 +75,21 @@
   required to end at the pinned ICANN Root CA, before the anchors are used (`-SkipSignatureCheck` is the explicit opt-out).
 - The TCP retry after a truncated UDP reply checks the reply ID, QR bit and question like a UDP reply (`Test-DnsReplyMatch`).
 - DoH works on Windows PowerShell 5.1 (it never loaded System.Net.Http there); `-DoT '[ipv6]'` without a port and IPv6-literal DoH URLs are accepted.
+### Fixed (third code review)
+- **Anchor-signing chain could be forged.** Only `NotTimeValid` was inspected, so a leaf signed by an attacker's own key, naming the ICANN root as
+  its issuer and shipped beside the genuine public root certificate, passed the pinned-thumbprint check. Now every chain status except `UntrustedRoot`
+  is fatal and the chain must be built (`Test-DnssecAnchorSignerChain`, with a forged-leaf test).
+- **A CNAME chain cut short was accepted as Secure.** Validation now follows the CNAME chain from the query name; the name it ends at needs data of
+  the queried type or an authenticated NXDOMAIN/NODATA, otherwise the answer is not Secure. Resolve-DnsIterative now follows a CNAME for every type
+  except CNAME and the DNSSEC types (it used to for A/AAAA only).
+- **NSEC wildcard proof** covers the NEXT CLOSER name (RFC 4035 section 5.3.4), as the NSEC3 branch already did; and a queried literal `*.example.com`
+  owner (RRSIG Labels excludes the `*`) is no longer mistaken for an expansion.
+- **DS denial from the child zone** (the child's own SOA/apex NSEC) is rejected: only the parent can prove a DS absent. A single SOA RRset is used.
+- A parent signature on the DS, or a DNSKEY signature, made with an unsupported algorithm is `Insecure` (the root: `Indeterminate`), not `Bogus`.
+- `Test-DnsReplyMatch` accepts a REFUSED/FORMERR/... reply with an empty question section (it used to look like a full timeout) but not one claiming
+  success, and rejects replies with more than one question. DoT and DoH replies now go through it (ID, QR and question), not just the ID.
+- The root DNSKEY RRset only includes records owned by the root.
+- DoH: one shared `HttpClient` (no new TLS handshake per query) and a non-`https://` endpoint is refused.
 ### Known, not yet fixed
 - Ed448 (algorithm 16) is not supported (no SHAKE256 / curve448 in .NET) and throws "Unsupported DNSSEC algorithm", which counts as a failed
   verification. NSEC3 opt-out and Wildcard-synthesised NODATA denials (other than the DS case) are reported `Indeterminate` rather than proven.

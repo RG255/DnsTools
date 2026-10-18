@@ -84,6 +84,12 @@
 		# Without this a signed NSEC/SOA from an unrelated zone (the root, a parent) could be replayed as the proof.
 		if ($zone -ne '' -and $qname -ne $zone -and -not $qname.EndsWith('.' + $zone))
 		{return & $mk 'Bogus' $kind "The SOA zone '$zone' does not contain the query name '$qname' - the denial is for a different zone"}
+		# A DS lives in the PARENT zone. A DS-type denial that arrives with the CHILD's own SOA (zone == query name) was
+		# produced by the child, which is not authoritative for DS and so cannot prove it absent.
+		if ($QueryType -eq 43 -and $zone -eq $qname)
+		{return & $mk 'Bogus' $kind "A DS denial for '$qname' came from the child zone itself; only the parent can prove a DS absent"}
+		# One SOA RRset: records for other owners are ignored for the signature check below.
+		$soa = @($soa | Where-Object -FilterScript { $_.Name.TrimEnd('.').ToLower() -eq $zone })
 
 		$trust = Get-DnssecTrustedKey -Zone $zone -RootServers $RootServers -Cache $Cache
 		if ($trust.Status -ne 'Secure')

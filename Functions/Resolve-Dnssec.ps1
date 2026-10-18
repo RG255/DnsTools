@@ -101,7 +101,7 @@
 		# --- 2. Validate every answer RRset against authenticated keys ---
 		# (0.8: an answer with no RRSIG at all is now judged here too - provably unsigned, stripped, or not proven -
 		# instead of being rejected up front as 'No RRSIGs returned'.)
-		$check = Test-DnssecResponseSignature -Answers @($resp.Answers) -Authority @($resp.Authority) -RootServers $RootServers
+		$check = Test-DnssecResponseSignature -Answers @($resp.Answers) -Authority @($resp.Authority) -Response $resp -QueryName $name -QueryType $TypeCode -RootServers $RootServers
 
 		$valid = ($check.Status -eq 'Secure')
 		$reason = if ($valid)

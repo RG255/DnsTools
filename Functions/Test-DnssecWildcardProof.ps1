@@ -61,12 +61,20 @@
 		$name = $Owner.Trim().TrimEnd('.').ToLower()
 		$sigs = @($Authority | Where-Object -FilterScript { $_.Type -eq 46 })
 
+		# The NEXT CLOSER name: the owner trimmed to LabelCount + 1 labels (RFC 4035 5.3.4). The proof must cover THAT name, not the
+		# whole owner: if an intermediate name between the wildcard's parent and the owner exists, no wildcard applies, yet an
+		# NSEC covering the full owner would still pass.
+		$ownerLabels = @($name.Split('.') | Where-Object -FilterScript { $_ -ne '' })
+		if ($ownerLabels.Count -le $LabelCount)
+		{return [pscustomobject]@{ Proven = $false; Reason = 'The owner has no more labels than the RRSIG Labels field' }}
+		$nextCloserName = ($ownerLabels[($ownerLabels.Count - $LabelCount - 1)..($ownerLabels.Count - 1)] -join '.')
+
 		foreach ($rr in @($Authority | Where-Object -FilterScript { $_.Type -eq 47 -and $_.RDataObject -is [DnsNsecRecord] }))
 		{
-			if (-not (Test-DnssecNsecSpan -Record $rr -Name $name))
+			if (-not (Test-DnssecNsecSpan -Record $rr -Name $nextCloserName))
 			{continue}
 			if ((Test-DnssecRrsetSignature -Rrset @($rr) -Rrsigs $sigs -KeyRecords $Keys -ZoneName $Zone).Valid)
-			{return [pscustomobject]@{ Proven = $true; Reason = "Signed NSEC covers '$name'" }}
+			{return [pscustomobject]@{ Proven = $true; Reason = "Signed NSEC covers the next closer name '$nextCloserName'" }}
 		}
 
 		$nsec3 = @($Authority | Where-Object -FilterScript { $_.Type -eq 50 -and $_.RDataObject -is [DnsNsec3Record] })

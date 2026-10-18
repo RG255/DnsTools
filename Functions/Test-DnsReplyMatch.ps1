@@ -37,11 +37,23 @@
 	{$qEnd += 1 + $Query[$qEnd]}
 	$qEnd += 5
 
-	if ($Query.Length -lt $qEnd -or $Reply.Length -lt $qEnd)
+	if ($Query.Length -lt $qEnd -or $Reply.Length -lt 12)
 	{return $false}
 	if ($Reply[0] -ne $Query[0] -or $Reply[1] -ne $Query[1])
 	{return $false}
 	if (($Reply[2] -band 0x80) -eq 0)
+	{return $false}
+
+	# QDCOUNT. A server that rejects a query (FORMERR, NOTIMP, REFUSED, SERVFAIL, ...) often answers with the question section
+	# EMPTY: with the matching ID and QR set and a non-zero RCODE that is a genuine error reply, not a mismatch (rejecting it
+	# made every such error look like a full timeout). With QDCOUNT = 0 and RCODE 0 there is nothing tying the reply to this
+	# query, so it is not accepted. More than one question is never a reply to our single-question query.
+	$replyQuestions = ([int]$Reply[4] * 256) + [int]$Reply[5]
+	if ($replyQuestions -eq 0)
+	{return (($Reply[3] -band 0x0F) -ne 0)}
+	if ($replyQuestions -ne 1)
+	{return $false}
+	if ($Reply.Length -lt $qEnd)
 	{return $false}
 
 	for ($i = 12; $i -lt $qEnd; $i++)

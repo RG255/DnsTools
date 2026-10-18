@@ -423,7 +423,7 @@
 				}
 			}
 			if ($null -eq $check) {
-				$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -Authority @($Response.Authority) -RootServers $RootServers
+				$check = Test-DnssecResponseSignature -Answers @($Response.Answers) -Authority @($Response.Authority) -Response $Response -QueryName $fqdn -QueryType $TypeCode -RootServers $RootServers
 			}
 
 			if ($check.Status -in 'Unsigned', 'Insecure', 'Indeterminate') {
@@ -568,7 +568,7 @@
 					}
 
 					# If we got a CNAME but wanted A/AAAA, follow the CNAME chain
-					if ($cnameRecords.Count -gt 0 -and $TypeCode -in @(1, 28)) {
+					if ($cnameRecords.Count -gt 0 -and $TypeCode -ne 5 -and $TypeCode -notin @(43, 46, 47, 48, 50)) {
 						$cnameTarget = $cnameRecords[0].RDataObject.Target
 						Write-Verbose -Message "Following CNAME: $fqdn -> $cnameTarget"
 

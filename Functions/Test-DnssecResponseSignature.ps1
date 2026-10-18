@@ -50,6 +50,14 @@
 		[AllowEmptyCollection()]
 		[psobject[]]$Authority = @(),
 
+		# Optional context for the CNAME-terminus check: when the answer is a CNAME chain, the final name must either have data of
+		# the queried type or an authenticated denial. Supply the whole response (header + authority), the original query name and type.
+		[object]$Response = $null,
+
+		[string]$QueryName = '',
+
+		[int]$QueryType = 0,
+
 		[string[]]$RootServers = $script:RootServerAddresses
 	)
 
@@ -202,7 +210,12 @@
 				{$firstSigner = $secureTrust}
 
 				# A wildcard-synthesised answer is only trustworthy with the signed proof that the exact name does not exist.
-				$ownerLabelCount = @($owner.Split('.') | Where-Object -FilterScript { $_ -ne '' }).Count
+				# The RRSIG Labels field never counts a leading '*', so a signed RRset whose owner IS the wildcard (*.example.com,
+				# queried directly) has Labels = labels - 1 yet is not an expansion.
+				$ownerLabelList = @($owner.Split('.') | Where-Object -FilterScript { $_ -ne '' })
+				$ownerLabelCount = $ownerLabelList.Count
+				if ($ownerLabelCount -gt 0 -and $ownerLabelList[0] -eq '*')
+				{$ownerLabelCount--}
 				if ([int]$secureSig.Labels -lt $ownerLabelCount)
 				{
 					if (@($Authority).Count -eq 0)
@@ -233,6 +246,36 @@
 			{$insecure = $true}
 			if (-not $rrBogus -and -not $rrInsecure -and $rrIndeterminate)
 			{$indeterminate = $true}
+		}
+
+		# CNAME terminus. Every RRset above verified, but a CNAME chain can be CUT SHORT: an on-path attacker who drops the records
+		# after a signed CNAME leaves a perfectly valid-looking, truncated answer. Follow the chain from the query name; the name it
+		# ends at must have data of the queried type, or an authenticated NODATA / NXDOMAIN for it.
+		if ($null -ne $Response -and $QueryType -gt 0 -and $QueryType -ne 5 -and $QueryType -ne 255 -and $QueryName -ne '' -and -not $bogus)
+		{
+			$current = $QueryName.Trim().TrimEnd('.').ToLower()
+			for ($hop = 0; $hop -lt 9; $hop++)
+			{
+				$link = @($Answers | Where-Object -FilterScript { $_.Type -eq 5 -and $_.Name.TrimEnd('.').ToLower() -eq $current } | Select-Object -First 1)
+				if ($link.Count -eq 0)
+				{break}
+				$current = $link[0].RDataObject.Target.TrimEnd('.').ToLower()
+			}
+			$hasData = @($Answers | Where-Object -FilterScript { $_.Type -eq $QueryType -and $_.Name.TrimEnd('.').ToLower() -eq $current }).Count -gt 0
+			if (-not $hasData)
+			{
+				$terminus = Test-DnssecNegativeResponse -Response $Response -QueryName $current -QueryType $QueryType -RootServers $RootServers -Cache $cache
+				if ($terminus.Status -eq 'Secure')
+				{$details.Add("The CNAME chain ends at '$current' with an authenticated $($terminus.Kind): $($terminus.Details -join '; ')")}
+				if ($terminus.Status -ne 'Secure')
+				{$details.Add("The answer ends at '$current' with no data of type $QueryType and no authenticated denial ($($terminus.Status)): $($terminus.Details -join '; ') - the chain may have been cut short")}
+				if ($terminus.Status -eq 'Bogus')
+				{$bogus = $true}
+				if ($terminus.Status -eq 'Insecure')
+				{$insecure = $true}
+				if ($terminus.Status -eq 'Indeterminate')
+				{$indeterminate = $true}
+			}
 		}
 
 		$status = 'Secure'
