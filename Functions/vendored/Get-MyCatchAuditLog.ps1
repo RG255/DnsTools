@@ -1,4 +1,4 @@
-﻿# VENDORED from CommonScripts\0.2\Functions\Get-MyCatchAuditLog.ps1 by Sync-SharedUtilities [SHA256 3F4774D6DD2DBF0952B691C520DF795B0B35E245F41D85E9CFC9E7B5BD79B525] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
+﻿# VENDORED from CommonScripts\0.2\Functions\Get-MyCatchAuditLog.ps1 by Sync-SharedUtilities [SHA256 707330E9E05389E6C971417A358C8FB4A4E7E8C473AC175F45BACA9B8F9D9504] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
 Function Get-MyCatchAuditLog
 {
 	<#
@@ -69,6 +69,6 @@ Function Get-MyCatchAuditLog
 	}
 
 	$Private:_result = If ($Global:MyCatchAuditLog) { $Global:MyCatchAuditLog.ToArray() } Else { @() }
-	If ($Clear -and $Global:MyCatchAuditLog) { $Global:MyCatchAuditLog.Clear() }
+	If ($Clear -and $Global:MyCatchAuditLog) { $Global:MyCatchAuditLog.Clear(); $Global:MyCatchAuditLogDropped = 0 }
 	return $Private:_result
 }

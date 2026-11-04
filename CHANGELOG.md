@@ -2,6 +2,12 @@
 
 ## v0.8
 
+### Changed (2026-11-03, vendored utilities only - no DnsTools code change)
+- Re-vendored the shared catch-audit functions (`Write-MyCatchAudit`, `Get-MyCatchAuditLog`, `Show-MyCatchAuditSummary`) from the
+  shared master. The queue of catch-audit entries that could not be persisted stays capped at 500 but now counts the overflow and warns
+  once instead of dropping silently; the in-memory audit log is capped at 1000 entries (oldest dropped, counted); the summary prints a
+  NOTE with both dropped counts.
+
 ### Fixed (DNSSEC validation failed open or failed valid answers)
 - `Resolve-Dnssec` and `Test-DnssecChain` tested the object returned by `Test-DnssecRrsig` (always truthy) instead of its
   `.Valid`, so an invalid signature was never rejected.

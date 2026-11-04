@@ -1,4 +1,4 @@
-﻿# VENDORED from CommonScripts\0.2\Functions\Write-MyCatchAudit.ps1 by Sync-SharedUtilities [SHA256 CEBB5278BB2EFCD1CE53D5EFEC29B6AAC93873C7BCCDB334FA39D7418A4C4849] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
+﻿# VENDORED from CommonScripts\0.2\Functions\Write-MyCatchAudit.ps1 by Sync-SharedUtilities [SHA256 2139FBAB9818E82F731DF0D0AF9F389FB3CFEC84649613D35FB50B1BE18385CB] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
 Function Write-MyCatchAudit
 {
 	<#
@@ -130,6 +130,15 @@ Function Write-MyCatchAudit
 			IsTeardown     = [Bool]$Teardown
 		}
 		$Global:MyCatchAuditLog.Add($Private:_record)
+		# Cap the in-memory view (a runaway loop must not grow it without bound). Oldest entries go first and are
+		# counted in $Global:MyCatchAuditLogDropped (reported by Show-MyCatchAuditSummary). The persisted file,
+		# when writable, is unaffected and keeps everything.
+		$Private:_logCap = 1000
+		While ($Global:MyCatchAuditLog.Count -gt $Private:_logCap)
+		{
+			$Global:MyCatchAuditLog.RemoveAt(0)
+			$Global:MyCatchAuditLogDropped = 1 + [Int]$Global:MyCatchAuditLogDropped
+		}
 
 		# PERSIST (2026-09-10) - see Get-MyCatchAuditPersistPath's own doc for why and where. This is a
 		# best-effort durability layer ON TOP of the in-memory capture above, which has already
@@ -166,24 +175,38 @@ Function Write-MyCatchAudit
 			{
 				If (-not $Global:MyCatchAuditUnpersisted)
 				{ $Global:MyCatchAuditUnpersisted = [System.Collections.Generic.List[String]]::new() }
-				If ($Global:MyCatchAuditUnpersisted.Count -lt 500)
-				{ $Global:MyCatchAuditUnpersisted.Add([String]$Private:_jsonLine) }
-				If (-not $Global:MyCatchAuditRelayAvailable)
-				{ Write-Warning -Message ('Write-MyCatchAudit: this session cannot write the persisted catch-audit file (access denied) and has no elevated session to relay it through; the entry stays in memory only: {0}' -f $_.Exception.Message) }
+				# Cap on the relay queue (wanted - keeps a runaway loop from growing it without bound). When it is
+				# full the entry is NOT queued: count it, warn once per process, and it survives only in
+				# $Global:MyCatchAuditLog (the separate in-memory log, which has already received it above).
+				$Private:_queueCap = 500
+				$Private:_queued = $false
+				If ($Global:MyCatchAuditUnpersisted.Count -lt $Private:_queueCap)
+				{ $Global:MyCatchAuditUnpersisted.Add([String]$Private:_jsonLine); $Private:_queued = $true }
+				Else
+				{
+					$Global:MyCatchAuditUnpersistedDropped = 1 + [Int]$Global:MyCatchAuditUnpersistedDropped
+					If (-not $Global:MyCatchAuditUnpersistedOverflowWarned)
+					{
+						$Global:MyCatchAuditUnpersistedOverflowWarned = $true
+						Write-Warning -Message ('Write-MyCatchAudit: the unpersisted catch-audit queue is full ({0} entries); further entries are kept only in $Global:MyCatchAuditLog (in memory) and counted in $Global:MyCatchAuditUnpersistedDropped.' -f $Private:_queueCap)
+					}
+				}
+				If (-not $Global:MyCatchAuditRelayAvailable -and $Private:_queued)
+				{ Write-Warning -Message ('Write-MyCatchAudit: this session cannot write the persisted catch-audit file (access denied) and has no elevated session to relay it through; the entry is queued in memory only: {0}' -f $_.Exception.Message) }
 			}
 			Else
 			{
-			# Not silent - but calling Write-MyCatchAudit to report ITS OWN persist step failing is
-			# recursive by construction, so this checks the call stack first: if THIS is already a
-			# recursive call (i.e. Write-MyCatchAudit already appears once below this frame, meaning
-			# we got here by trying to report a PREVIOUS persist failure), stop recursing and fall back
-			# to a direct Write-Warning instead - bounding the recursion to exactly one extra level
-			# while still surfacing every failure, rather than silently swallowing the second one.
-			$Private:_alreadyRecursing = @(Get-PSCallStack | Where-Object { $_.Command -eq 'Write-MyCatchAudit' }).Count -gt 1
-			If ($Private:_alreadyRecursing)
-			{ Write-Warning -Message ('Write-MyCatchAudit: could not persist a catch-audit entry, and the recursive report of that also failed to persist: {0}' -f $_.Exception.Message) }
-			Else
-			{ Write-MyCatchAudit -Source 'Write-MyCatchAudit: failed to persist a catch-audit entry to disk' -ErrorRecord $_ }
+				# Not silent - but calling Write-MyCatchAudit to report ITS OWN persist step failing is
+				# recursive by construction, so this checks the call stack first: if THIS is already a
+				# recursive call (i.e. Write-MyCatchAudit already appears once below this frame, meaning
+				# we got here by trying to report a PREVIOUS persist failure), stop recursing and fall back
+				# to a direct Write-Warning instead - bounding the recursion to exactly one extra level
+				# while still surfacing every failure, rather than silently swallowing the second one.
+				$Private:_alreadyRecursing = @(Get-PSCallStack | Where-Object { $_.Command -eq 'Write-MyCatchAudit' }).Count -gt 1
+				If ($Private:_alreadyRecursing)
+				{ Write-Warning -Message ('Write-MyCatchAudit: could not persist a catch-audit entry, and the recursive report of that also failed to persist: {0}' -f $_.Exception.Message) }
+				Else
+				{ Write-MyCatchAudit -Source 'Write-MyCatchAudit: failed to persist a catch-audit entry to disk' -ErrorRecord $_ }
 			}
 		}
 

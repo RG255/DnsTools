@@ -1,4 +1,4 @@
-﻿# VENDORED from CommonScripts\0.2\Functions\Show-MyCatchAuditSummary.ps1 by Sync-SharedUtilities [SHA256 F8213E8DB30D3CFE36ACC4F654F583A21686C42D445CD86C575DBE4ECA71606D] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
+﻿# VENDORED from CommonScripts\0.2\Functions\Show-MyCatchAuditSummary.ps1 by Sync-SharedUtilities [SHA256 63F77E2CC051723041B5C6F7AAA824657854464FDCD2CF99A07C8829D4552F16] - DO NOT EDIT (edit the master; Deploy-Modules re-syncs).
 Function Show-MyCatchAuditSummary
 {
 	<#
@@ -46,6 +46,7 @@ Function Show-MyCatchAuditSummary
 	[CmdletBinding()]
 	Param ([Switch]$Clear, [Switch]$Persisted)
 
+	$Private:_logDropped = [Int]$Global:MyCatchAuditLogDropped
 	$Private:_log = If ($Persisted) { Get-MyCatchAuditLog -Persisted } Else { Get-MyCatchAuditLog -Clear:$Clear }
 	If (-not $Private:_log -or $Private:_log.Count -eq 0) { return }
 
@@ -67,6 +68,12 @@ Function Show-MyCatchAuditSummary
 		{ $Private:_flatMessage = $Private:_flatMessage.Substring(0, $Private:_maxMessageLength) + '...' }
 		Write-Output -InputObject ('  {0} x{1} - {2}' -f $Private:_shortType, $Private:_g.Count, $Private:_example.Source)
 		Write-Output -InputObject ('      {0}' -f $Private:_flatMessage)
+	}
+	# Entries lost to the in-memory caps (oldest log entries; relay-queue overflow). Captured before the call
+	# above cleared anything: -Clear resets the log counter only inside Get-MyCatchAuditLog, so read it first.
+	If (-not $Persisted -and ($Private:_logDropped -or $Global:MyCatchAuditUnpersistedDropped))
+	{
+		Write-Output -InputObject ('  NOTE: {0} older in-memory entr(ies) dropped at the 1000-entry cap; {1} entr(ies) not queued for persisting (queue full).' -f [Int]$Private:_logDropped, [Int]$Global:MyCatchAuditUnpersistedDropped)
 	}
 	If ($Persisted)
 	{ Write-Output -InputObject 'Run Get-MyCatchAuditLog -Persisted for full detail, Invoke-MyCatchAuditTriage to resolve individually, or Clear-MyCatchAuditLog to archive all of it.' }
