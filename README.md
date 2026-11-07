@@ -40,8 +40,12 @@ Import-Module DnsTools -RequiredVersion 0.8
 # Iterative resolution
 Resolve-DnsIterative -Name 'example.com' -Type A
 
-# DNSSEC validation
-Resolve-DnssecName -Name 'example.com'
+# DNSSEC validation (Valid is $true only for a fully authenticated answer)
+Resolve-Dnssec -Name 'example.com' -Type A
+Resolve-DnsIterative -Name 'example.com' -Type A -ValidateDnssec
+
+# Reverse lookup
+Resolve-DnsIterative -IPAddr '1.1.1.1'
 
 # DNS over TLS
 Resolve-DnsIterative -Name 'example.com' -Type A -DoT '1.1.1.1'

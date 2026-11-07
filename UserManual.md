@@ -152,6 +152,7 @@ $result.DnssecStatus   # Secure, Insecure, Unsigned, Indeterminate or Bogus
 $result.DnssecDetails  # one line per RRset: what was checked and why it passed or failed
 
 # Resolve and validate in one step; Valid is $true only for a fully authenticated answer
+# (Resolve-DnssecName is a short wrapper: Resolve-DnssecName -Name cloudflare.com, -Type is the numeric type code, default 1 = A)
 Resolve-Dnssec -Name cloudflare.com -Type A
 Resolve-Dnssec -Name nothere.example.com -Type A   # a signed NXDOMAIN / NODATA is authenticated too
 
@@ -161,6 +162,17 @@ Resolve-DnssecChain -Name cloudflare.com -Type A
 # A step-by-step report of the whole chain, root downwards
 Test-DnssecValidation -Name www.cloudflare.com
 ```
+
+`Resolve-Dnssec` returns an object with these properties:
+
+| Property | Description |
+|----------|-------------|
+| `Valid` | `$true` only when the answer is fully authenticated (`Status` is `Secure`) |
+| `Status` | Secure, Insecure, Unsigned, Indeterminate or Bogus (see below) |
+| `Reason` / `Details` | A one-line summary, and one line per RRset checked |
+| `Answer`, `Rrsigs`, `Dnskeys` | The answer records, their signatures and the authenticated keys |
+| `Chain` | The authenticated DNSKEYs per signing zone |
+| `Negative` | `NXDOMAIN` or `NODATA` when the answer is an authenticated denial of existence |
 
 What each status means:
 
@@ -355,10 +367,10 @@ DNSKEY set. If validation reports that no root DNSKEY matches a trust anchor, re
 
 ### Update Trust Anchors
 ```powershell
-# Fetch current trust anchors from IANA
+# Fetch the current trust anchors from IANA, verify them, and ask before overwriting the file
 Update-DnssecTrustAnchorFile
 
-# Update and save to file
+# Same, without the confirmation prompt (-WhatIf still shows what would happen without writing)
 Update-DnssecTrustAnchorFile -Force
 ```
 
@@ -432,6 +444,20 @@ The `-DoH` parameter requires an HTTPS URL:
 - Example: `https://dns.google/dns-query`
 - HTTP URLs are not accepted for security
 
+## Diagnostics: function trace and catch audit
+
+Two optional diagnostics are built in (both shared across modules):
+
+```powershell
+Enable-MyFunctionTrace -Option 1    # log every instrumented function call for this process (-Option is mandatory, 1-3)
+Disable-MyFunctionTrace
+Enable-MyCatchAudit                 # also echo caught errors live (they are always recorded)
+Get-MyCatchAuditLog                 # list the recorded caught errors
+Show-MyCatchAuditSummary            # grouped summary
+```
+
+The trace log is `%ProgramData%\FunctionTrace\FunctionTrace.log`. Use `Get-Help <command> -Full` for the options.
+
 ## Version History
 
 - **0.8**: DNSSEC validation rebuilt on a real chain of trust (keys authenticated from the root trust anchor; an invalid signature is now
@@ -444,4 +470,4 @@ The `-DoH` parameter requires an HTTPS URL:
 
 ## Support
 
-For issues or feature requests, contact the module maintainer.
+For issues or feature requests, open an issue on the project page: https://github.com/RG255/DnsTools
